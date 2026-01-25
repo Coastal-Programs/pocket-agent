@@ -602,6 +602,25 @@ async function initializeAgent(): Promise<void> {
     scheduler.setNotificationHandler((title: string, body: string) => {
       showNotification(title, body);
     });
+
+    // Set chat handler for scheduler (sends messages to chat window)
+    scheduler.setChatHandler((jobName: string, prompt: string, response: string) => {
+      console.log(`[Scheduler] Sending chat message for job: ${jobName}`);
+      // Send to chat window if open
+      if (chatWindow && !chatWindow.isDestroyed()) {
+        chatWindow.webContents.send('scheduler:message', { jobName, prompt, response });
+      }
+      // Also open chat window if not open
+      if (!chatWindow || chatWindow.isDestroyed()) {
+        openChatWindow();
+        // Wait a bit for window to load, then send message
+        setTimeout(() => {
+          if (chatWindow && !chatWindow.isDestroyed()) {
+            chatWindow.webContents.send('scheduler:message', { jobName, prompt, response });
+          }
+        }, 1000);
+      }
+    });
   }
 
   // Initialize Telegram

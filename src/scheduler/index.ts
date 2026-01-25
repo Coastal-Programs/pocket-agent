@@ -35,6 +35,8 @@ export class CronScheduler {
   private telegramBot: TelegramBot | null = null;
   private jobHistory: JobResult[] = [];
   private maxHistorySize: number = 100;
+  private reloadInterval: ReturnType<typeof setInterval> | null = null;
+  private lastJobCount: number = 0;
 
   constructor() {}
 
@@ -44,7 +46,30 @@ export class CronScheduler {
   async initialize(memory: MemoryManager): Promise<void> {
     this.memory = memory;
     await this.loadJobsFromDatabase();
+    this.lastJobCount = this.jobs.size;
     console.log(`[Scheduler] Initialized with ${this.jobs.size} jobs`);
+
+    // Start periodic check for new jobs (every 60 seconds)
+    this.reloadInterval = setInterval(() => {
+      this.checkForNewJobs();
+    }, 60000);
+  }
+
+  /**
+   * Check if new jobs have been added to the database
+   */
+  private async checkForNewJobs(): Promise<void> {
+    if (!this.memory) return;
+
+    const dbJobs = this.memory.getCronJobs(false); // Get all jobs
+    const currentCount = dbJobs.length;
+
+    // If job count changed, reload
+    if (currentCount !== this.lastJobCount) {
+      console.log(`[Scheduler] Job count changed (${this.lastJobCount} -> ${currentCount}), reloading...`);
+      await this.loadJobsFromDatabase();
+      this.lastJobCount = this.jobs.size;
+    }
   }
 
   /**
@@ -187,8 +212,11 @@ export class CronScheduler {
 
       case 'desktop':
       case 'default':
-        // Emit event for desktop notification
-        this.emitDesktopNotification(job.name, response);
+        // Send to chat window AND show notification
+        this.emitChatMessage(job.name, job.prompt, response);
+        // Notification: friendly title, plain text body (strip markdown)
+        const plainResponse = this.stripMarkdown(response);
+        this.emitDesktopNotification('Pocket Agent', plainResponse.slice(0, 200));
         break;
 
       default:
@@ -200,10 +228,42 @@ export class CronScheduler {
    * Emit desktop notification (handled by main process)
    */
   private emitDesktopNotification(title: string, body: string): void {
-    // Use global event emitter pattern
     if (this.onNotification) {
       this.onNotification(title, body);
     }
+  }
+
+  /**
+   * Emit chat message (sends to chat window)
+   */
+  private emitChatMessage(jobName: string, prompt: string, response: string): void {
+    if (this.onChatMessage) {
+      this.onChatMessage(jobName, prompt, response);
+    }
+  }
+
+  /**
+   * Strip markdown formatting for plain text (notifications)
+   */
+  private stripMarkdown(text: string): string {
+    return text
+      // Remove headers
+      .replace(/^#{1,6}\s+/gm, '')
+      // Remove bold/italic
+      .replace(/\*\*([^*]+)\*\*/g, '$1')
+      .replace(/\*([^*]+)\*/g, '$1')
+      .replace(/__([^_]+)__/g, '$1')
+      .replace(/_([^_]+)_/g, '$1')
+      // Remove code blocks
+      .replace(/```[\s\S]*?```/g, '[code]')
+      .replace(/`([^`]+)`/g, '$1')
+      // Remove links
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+      // Remove bullet points
+      .replace(/^[\s]*[-*+]\s+/gm, '• ')
+      // Remove extra whitespace
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 
   /**
@@ -213,7 +273,15 @@ export class CronScheduler {
     this.onNotification = handler;
   }
 
+  /**
+   * Set chat message handler (for sending to chat window)
+   */
+  setChatHandler(handler: (jobName: string, prompt: string, response: string) => void): void {
+    this.onChatMessage = handler;
+  }
+
   private onNotification?: (title: string, body: string) => void;
+  private onChatMessage?: (jobName: string, prompt: string, response: string) => void;
 
   /**
    * Add result to history
@@ -290,6 +358,12 @@ export class CronScheduler {
    * Stop all jobs
    */
   stopAll(): void {
+    // Stop reload interval
+    if (this.reloadInterval) {
+      clearInterval(this.reloadInterval);
+      this.reloadInterval = null;
+    }
+
     for (const [name, task] of this.tasks) {
       task.stop();
       console.log(`[Scheduler] Stopped: ${name}`);

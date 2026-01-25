@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:;">
   <title>Pocket Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     :root {
@@ -32,7 +35,7 @@
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+      font-family: 'Sora', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
       height: 100vh;
@@ -74,9 +77,10 @@
     }
 
     header h1 {
-      font-size: 15px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
+      font-family: 'Sora', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
     }
 
     .stats {
@@ -185,6 +189,30 @@
       color: var(--text-muted);
       font-size: 13px;
       padding: 8px 16px;
+    }
+
+    .message.reminder {
+      align-self: flex-start;
+      background: var(--assistant-bubble);
+      border: 1px solid var(--accent);
+      border-left: 3px solid var(--accent);
+      color: var(--text-primary);
+    }
+
+    .reminder-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .reminder-header svg {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
     }
 
     .message.error {
@@ -741,7 +769,50 @@
       loadHistory();
       updateStats();
       input.focus();
+
+      // Listen for scheduler messages
+      window.pocketAgent.onSchedulerMessage((data) => {
+        console.log('[Chat] Received scheduler message:', data.jobName);
+        handleSchedulerMessage(data);
+      });
     });
+
+    function handleSchedulerMessage(data) {
+      // Clear empty state if present
+      const emptyState = messagesDiv.querySelector('.empty-state');
+      if (emptyState) emptyState.remove();
+
+      // Create reminder message with icon
+      const reminderDiv = document.createElement('div');
+      reminderDiv.className = 'message reminder';
+
+      const promptPreview = data.prompt.length > 100
+        ? data.prompt.slice(0, 100) + '...'
+        : data.prompt;
+
+      // Clock icon SVG
+      const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+
+      reminderDiv.innerHTML = `
+        <div class="reminder-header">
+          ${clockIcon}
+          <span>Scheduled Reminder</span>
+        </div>
+        <div class="reminder-content">${promptPreview}</div>
+      `;
+
+      messagesDiv.appendChild(reminderDiv);
+
+      // Add the agent's response
+      addMessage('assistant', data.response);
+
+      // Update stats and scroll
+      updateStats();
+      scrollToBottom();
+
+      // Focus window
+      window.focus();
+    }
 
     async function loadHistory() {
       try {

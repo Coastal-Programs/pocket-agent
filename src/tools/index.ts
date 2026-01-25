@@ -9,9 +9,11 @@
 
 import { getBrowserToolDefinition, handleBrowserTool } from '../browser';
 import { getMemoryTools, setMemoryManager } from './memory-tools';
+import { getSchedulerTools } from './scheduler-tools';
 import { MemoryManager } from '../memory';
 
 export { setMemoryManager } from './memory-tools';
+export { getSchedulerTools } from './scheduler-tools';
 
 export interface MCPServerConfig {
   command: string;
@@ -127,6 +129,17 @@ export function getCustomTools(config: ToolsConfig): Array<{
       description: browserDef.description,
       input_schema: browserDef.input_schema as Record<string, unknown>,
       handler: handleBrowserTool,
+    });
+  }
+
+  // Scheduler tools (always enabled - scheduler availability checked at runtime)
+  const schedulerTools = getSchedulerTools();
+  for (const tool of schedulerTools) {
+    tools.push({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.input_schema as Record<string, unknown>,
+      handler: tool.handler,
     });
   }
 

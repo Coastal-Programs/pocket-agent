@@ -1,3 +1,4 @@
+import path from 'path';
 import { MemoryManager, Message } from '../memory';
 import { buildMCPServers, setMemoryManager, ToolsConfig, validateToolsConfig } from '../tools';
 import { closeBrowserManager } from '../browser';
@@ -205,6 +206,12 @@ class AgentManagerClass extends EventEmitter {
       appendParts.push(factsContext);
     }
 
+    // Add capabilities information
+    const capabilities = this.buildCapabilitiesPrompt();
+    if (capabilities) {
+      appendParts.push(capabilities);
+    }
+
     const options: SDKOptions = {
       model: this.model,
       cwd: this.projectRoot,
@@ -233,6 +240,79 @@ class AgentManagerClass extends EventEmitter {
     }
 
     return options;
+  }
+
+  private buildCapabilitiesPrompt(): string {
+    const cliPath = path.join(this.projectRoot, 'dist/cli/scheduler-cli.js');
+
+    return `## Your Capabilities as Pocket Agent
+
+You are a persistent personal AI assistant with special capabilities.
+
+### Scheduling & Reminders
+You CAN create scheduled tasks and reminders! The CLI is already installed and ready - just run the commands below. Do NOT try to install anything or run npm/yarn commands.
+
+\`\`\`bash
+# Create a reminder
+node "${cliPath}" create "water_reminder" "0 */2 * * *" "Time to drink some water!" "desktop"
+
+# List all tasks
+node "${cliPath}" list
+
+# Delete a task
+node "${cliPath}" delete "water_reminder"
+\`\`\`
+
+RULES:
+- Use short, clean names (e.g., "water_reminder", "standup", "break_time") - NO timestamps
+- Do NOT run npm, yarn, or any install commands - the CLI is ready to use
+- Just run the node command directly
+
+Cron format: "minute hour day month weekday" (0-59 0-23 1-31 1-12 0-7)
+- "0 9 * * *" = Daily 9 AM
+- "0 9 * * 1-5" = Weekdays 9 AM
+- "*/30 * * * *" = Every 30 min
+- "0 */2 * * *" = Every 2 hours
+- "0 9 * * 1" = Mondays 9 AM
+
+Channels: "desktop" (notification + chat) or "telegram"
+
+The scheduler checks for new tasks every 60 seconds, so tasks become active shortly after creation.
+
+### Memory & Facts
+You have persistent memory! PROACTIVELY save important info when the user shares it. Use the memory CLI:
+
+\`\`\`bash
+# Save a fact (use this PROACTIVELY when user shares info)
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" save "user_info" "name" "John Smith"
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" save "preferences" "color" "Favorite color is blue"
+
+# List all facts
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" list
+
+# List by category
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" list preferences
+
+# Search facts (fast keyword search)
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" search "coffee"
+
+# Delete a fact
+node "${path.join(this.projectRoot, 'dist/cli/memory-cli.js')}" delete "preferences" "color"
+\`\`\`
+
+Categories: user_info, preferences, projects, people, work, notes, decisions
+
+IMPORTANT: Save facts PROACTIVELY when user mentions:
+- Personal info (name, birthday, location)
+- Preferences (favorite things, likes/dislikes)
+- Projects they're working on
+- People important to them
+- Work/job details
+
+### Limitations
+- Cannot control macOS apps directly (no AppleScript)
+- Cannot send SMS or make calls
+- For desktop automation, user needs to enable Computer Use (Docker-based)`;
   }
 
   private extractFromMessage(message: any, current: string): string {
@@ -327,6 +407,11 @@ class AgentManagerClass extends EventEmitter {
 
       // Computer use tool
       computer: 'Desktop automation',
+
+      // Scheduler tools
+      schedule_task: 'Creating reminder',
+      list_scheduled_tasks: 'Listing reminders',
+      delete_scheduled_task: 'Deleting reminder',
     };
     return friendlyNames[name] || name;
   }
