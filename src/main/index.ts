@@ -11,6 +11,56 @@ import { loadInstructions, saveInstructions, getInstructionsPath } from '../conf
 import { closeTaskDb } from '../tools';
 import cityTimezones from 'city-timezones';
 
+/**
+ * Convert cron expression to human-readable format
+ */
+function cronToHuman(cron: string | null): string {
+  if (!cron) return 'Unknown schedule';
+
+  const parts = cron.split(' ');
+  if (parts.length !== 5) return cron;
+
+  const [minute, hour, dom, , dow] = parts;
+
+  // Interval patterns
+  if (minute.startsWith('*/')) {
+    const mins = minute.slice(2);
+    return `Every ${mins} min`;
+  }
+  if (hour.startsWith('*/')) {
+    const hrs = hour.slice(2);
+    return `Every ${hrs} hr${hrs === '1' ? '' : 's'}`;
+  }
+
+  // Time-based patterns
+  const h = parseInt(hour);
+  const m = parseInt(minute);
+  if (isNaN(h) || isNaN(m)) return cron;
+
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  const displayMinute = m.toString().padStart(2, '0');
+  const timeStr = `${displayHour}:${displayMinute} ${ampm}`;
+
+  // Day patterns
+  if (dow === '*' && dom === '*') {
+    return `${timeStr} daily`;
+  }
+  if (dow === '1-5') {
+    return `${timeStr} weekdays`;
+  }
+  if (dow === '0,6') {
+    return `${timeStr} weekends`;
+  }
+  if (dow !== '*') {
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const days = dow.split(',').map(d => dayNames[parseInt(d)] || d).join(', ');
+    return `${timeStr} on ${days}`;
+  }
+
+  return `${timeStr} daily`;
+}
+
 // Month name mapping for birthday parsing
 const MONTHS: Record<string, number> = {
   january: 1, jan: 1,
@@ -362,7 +412,7 @@ function updateTrayMenu(): void {
     {
       label: 'Chat',
       click: () => openChatWindow(),
-      accelerator: 'CmdOrCtrl+Shift+P',
+      accelerator: 'Alt+Z',
     },
     { type: 'separator' },
     {
@@ -431,7 +481,7 @@ function buildCronSubmenu(): Electron.MenuItemConstructorOptions[] {
 
   const items: Electron.MenuItemConstructorOptions[] = jobs.map(job => ({
     label: `${job.enabled ? '✓' : '✗'} ${job.name}`,
-    sublabel: job.schedule ?? undefined,
+    sublabel: cronToHuman(job.schedule),
     submenu: [
       {
         label: job.enabled ? 'Pause' : 'Activate',

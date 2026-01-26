@@ -59,6 +59,9 @@
       font-size: 16px;
       font-weight: 700;
       letter-spacing: -0.02em;
+    }
+
+    header h1 span {
       background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
       -webkit-background-clip: text;
       background-clip: text;
@@ -550,7 +553,7 @@
 </head>
 <body>
   <header>
-    <h1>Make It Yours ✨</h1>
+    <h1><span>Make It Yours</span> ✨</h1>
     <div class="header-actions">
       <button class="secondary" onclick="window.close()">Done</button>
       <button class="warning" onclick="restartAgent()" title="Reboot to apply changes">
