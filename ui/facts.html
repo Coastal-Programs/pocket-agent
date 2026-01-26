@@ -17,13 +17,14 @@
       --text-primary: #fafafa;
       --text-secondary: #a1a1a6;
       --text-muted: #636366;
-      --accent: #6366f1;
-      --accent-hover: #818cf8;
+      --accent: #a855f7;
+      --accent-secondary: #ec4899;
+      --accent-hover: #c084fc;
       --error: #ef4444;
       --success: #22c55e;
       --warning: #f59e0b;
-      --radius: 12px;
-      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-sm: 10px;
     }
 
     * {
@@ -58,6 +59,10 @@
       font-size: 16px;
       font-weight: 700;
       letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .fact-count {
@@ -81,12 +86,18 @@
       cursor: pointer;
       font-size: 13px;
       font-weight: 500;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .header-actions button:hover {
       background: var(--border);
       color: var(--text-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .header-actions button:active {
+      transform: translateY(0);
     }
 
     .content {
@@ -149,7 +160,10 @@
     }
 
     .facts-table .category {
-      color: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
       font-weight: 500;
       white-space: nowrap;
       width: 100px;

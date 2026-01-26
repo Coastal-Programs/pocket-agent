@@ -18,10 +18,11 @@
       --text-primary: #fafafa;
       --text-secondary: #a1a1a6;
       --text-muted: #636366;
-      --accent: #6366f1;
-      --accent-hover: #818cf8;
-      --radius: 16px;
-      --radius-sm: 8px;
+      --accent: #a855f7;
+      --accent-secondary: #ec4899;
+      --accent-hover: #c084fc;
+      --radius: 18px;
+      --radius-sm: 10px;
     }
 
     * {
@@ -56,6 +57,10 @@
       font-size: 15px;
       font-weight: 600;
       letter-spacing: -0.01em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .stats {
@@ -101,17 +106,23 @@
       background: var(--bg-tertiary);
       color: var(--text-secondary);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       cursor: pointer;
       font-size: 11px;
       font-weight: 500;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       white-space: nowrap;
     }
 
     .toolbar button:hover {
       background: var(--border);
       color: var(--text-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .toolbar button:active {
+      transform: translateY(0);
     }
 
     .spacer { flex: 1; min-width: 8px; }
@@ -176,7 +187,7 @@
 
     .link-sample.solid { background: var(--text-muted); }
     .link-sample.dashed {
-      background: repeating-linear-gradient(to right, var(--accent) 0px, var(--accent) 4px, transparent 4px, transparent 7px);
+      background: repeating-linear-gradient(to right, #a855f7 0px, #a855f7 4px, transparent 4px, transparent 7px);
     }
     .link-sample.dotted {
       background: repeating-linear-gradient(to right, var(--text-muted) 0px, var(--text-muted) 2px, transparent 2px, transparent 4px);
@@ -236,7 +247,7 @@
     }
 
     .link.category { stroke: #4a4a55; }
-    .link.semantic { stroke: var(--accent); stroke-dasharray: 5, 3; }
+    .link.semantic { stroke: #a855f7; stroke-dasharray: 5, 3; }
     .link.keyword { stroke: #3a3a45; stroke-dasharray: 2, 2; stroke-opacity: 0.4; }
 
     .link.highlighted {
@@ -467,7 +478,7 @@
   <script>
     // Category colors
     const CATEGORY_COLORS = {
-      user_info: '#6366f1',
+      user_info: '#a855f7',
       preferences: '#22c55e',
       projects: '#f59e0b',
       people: '#ec4899',

@@ -18,14 +18,16 @@
       --text-primary: #fafafa;
       --text-secondary: #a1a1a6;
       --text-muted: #636366;
-      --accent: #6366f1;
-      --accent-hover: #818cf8;
-      --user-bubble: #6366f1;
+      --accent: #a855f7;
+      --accent-secondary: #ec4899;
+      --accent-hover: #c084fc;
+      --user-bubble: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+      --user-bubble-solid: #a855f7;
       --assistant-bubble: #1c1c1e;
       --error: #ef4444;
       --success: #22c55e;
-      --radius: 16px;
-      --radius-sm: 8px;
+      --radius: 20px;
+      --radius-sm: 10px;
     }
 
     * {
@@ -54,6 +56,18 @@
       align-items: center;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      position: relative;
+    }
+
+    header::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent) 0%, var(--accent-secondary) 50%, var(--accent) 100%);
+      opacity: 0.5;
     }
 
     .header-left {
@@ -63,17 +77,17 @@
     }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+      box-shadow: 0 0 12px var(--accent);
       animation: pulse 2s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.9); }
     }
 
     header h1 {
@@ -81,6 +95,10 @@
       font-size: 16px;
       font-weight: 700;
       letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .stats {
@@ -108,12 +126,18 @@
       cursor: pointer;
       font-size: 12px;
       font-weight: 500;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .toolbar button:hover {
       background: var(--border);
       color: var(--text-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .toolbar button:active {
+      transform: translateY(0);
     }
 
     /* Messages Container */
@@ -158,11 +182,17 @@
     }
 
     @keyframes messageIn {
-      from {
+      0% {
         opacity: 0;
-        transform: translateY(10px) scale(0.98);
+        transform: translateY(16px) scale(0.92);
       }
-      to {
+      50% {
+        transform: translateY(-4px) scale(1.02);
+      }
+      75% {
+        transform: translateY(2px) scale(0.99);
+      }
+      100% {
         opacity: 1;
         transform: translateY(0) scale(1);
       }
@@ -172,15 +202,28 @@
       align-self: flex-end;
       background: var(--user-bubble);
       color: white;
-      border-bottom-right-radius: 4px;
+      border-bottom-right-radius: 6px;
+      box-shadow: 0 4px 14px rgba(168, 85, 247, 0.25);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .message.user:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(168, 85, 247, 0.35);
     }
 
     .message.assistant {
       align-self: flex-start;
       background: var(--assistant-bubble);
       border: 1px solid var(--border);
-      border-bottom-left-radius: 4px;
+      border-bottom-left-radius: 6px;
       color: var(--text-primary);
+      transition: transform 0.2s ease, border-color 0.2s ease;
+    }
+
+    .message.assistant:hover {
+      transform: translateY(-1px);
+      border-color: var(--text-muted);
     }
 
     .message.system {
@@ -378,22 +421,23 @@
     /* Status Indicator */
     .status-indicator {
       align-self: flex-start;
-      padding: 10px 14px;
+      padding: 12px 16px;
       background: var(--assistant-bubble);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      border-bottom-left-radius: 4px;
+      border-bottom-left-radius: 6px;
       display: flex;
       align-items: center;
-      gap: 10px;
-      animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      gap: 12px;
+      animation: messageIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
       max-width: 80%;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
     }
 
     .status-spinner {
-      width: 16px;
-      height: 16px;
-      border: 2px solid var(--border);
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(168, 85, 247, 0.2);
       border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.8s linear infinite;
@@ -417,10 +461,11 @@
       background: linear-gradient(
         90deg,
         var(--text-primary) 0%,
-        var(--accent) 25%,
-        var(--text-primary) 50%,
-        var(--accent) 75%,
-        var(--text-primary) 100%
+        var(--accent) 20%,
+        var(--accent-secondary) 40%,
+        var(--accent) 60%,
+        var(--text-primary) 80%,
+        var(--accent) 100%
       );
       background-size: 200% 100%;
       -webkit-background-clip: text;
@@ -473,35 +518,35 @@
     /* Simple typing dots fallback */
     .typing {
       align-self: flex-start;
-      padding: 12px 16px;
+      padding: 14px 18px;
       background: var(--assistant-bubble);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      border-bottom-left-radius: 4px;
+      border-bottom-left-radius: 6px;
       display: flex;
-      gap: 4px;
-      animation: messageIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      gap: 6px;
+      animation: messageIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
     .typing-dot {
-      width: 6px;
-      height: 6px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: var(--text-muted);
+      background: var(--accent);
       animation: typingBounce 1.4s infinite ease-in-out both;
     }
 
-    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
-    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
-    .typing-dot:nth-child(3) { animation-delay: 0s; }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; background: var(--accent); }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%); }
+    .typing-dot:nth-child(3) { animation-delay: 0s; background: var(--accent-secondary); }
 
     @keyframes typingBounce {
       0%, 80%, 100% {
-        transform: scale(0.8);
-        opacity: 0.5;
+        transform: scale(0.7) translateY(0);
+        opacity: 0.4;
       }
       40% {
-        transform: scale(1);
+        transform: scale(1.1) translateY(-4px);
         opacity: 1;
       }
     }
@@ -530,7 +575,7 @@
 
     .input-container:focus-within {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15), 0 0 20px rgba(168, 85, 247, 0.1);
     }
 
     .attach-btn {
@@ -544,13 +589,18 @@
       border-radius: var(--radius-sm);
       cursor: pointer;
       color: var(--text-muted);
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       flex-shrink: 0;
     }
 
     .attach-btn:hover {
       background: var(--border);
-      color: var(--text-primary);
+      color: var(--accent);
+      transform: scale(1.1) rotate(-10deg);
+    }
+
+    .attach-btn:active {
+      transform: scale(0.95) rotate(0deg);
     }
 
     .attach-btn svg {
@@ -613,46 +663,56 @@
     }
 
     #send-btn {
-      width: 40px;
-      height: 40px;
+      width: 42px;
+      height: 42px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
       color: white;
       border: none;
-      border-radius: 12px;
+      border-radius: 14px;
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
       flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.3);
     }
 
     #send-btn:hover:not(:disabled) {
-      background: var(--accent-hover);
-      transform: scale(1.02);
+      transform: scale(1.08) rotate(-3deg);
+      box-shadow: 0 6px 20px rgba(168, 85, 247, 0.45);
     }
 
     #send-btn:active:not(:disabled) {
-      transform: scale(0.98);
+      transform: scale(0.95) rotate(0deg);
     }
 
     #send-btn:disabled {
       background: var(--bg-tertiary);
       color: var(--text-muted);
       cursor: not-allowed;
+      box-shadow: none;
     }
 
     #send-btn svg {
       width: 18px;
       height: 18px;
+      transition: transform 0.2s ease;
+    }
+
+    #send-btn:hover:not(:disabled) svg {
+      transform: translateX(2px) translateY(-2px);
     }
 
     #send-btn.stop-btn {
-      background: var(--error);
+      background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+      box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
     }
 
     #send-btn.stop-btn:hover {
-      background: #dc2626;
+      background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+      box-shadow: 0 6px 20px rgba(239, 68, 68, 0.45);
+      transform: scale(1.08);
     }
 
     /* Empty State */
@@ -662,15 +722,52 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      color: var(--text-muted);
-      gap: 12px;
+      color: var(--text-secondary);
+      gap: 16px;
       padding: 40px;
-      animation: fadeIn 0.5s ease;
+      animation: emptyStateIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+    @keyframes emptyStateIn {
+      0% {
+        opacity: 0;
+        transform: scale(0.9) translateY(20px);
+      }
+      100% {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    .empty-state .empty-emoji {
+      font-size: 56px;
+      animation: wave 2.5s ease-in-out infinite;
+      transform-origin: 70% 70%;
+    }
+
+    @keyframes wave {
+      0%, 100% { transform: rotate(0deg); }
+      10% { transform: rotate(14deg); }
+      20% { transform: rotate(-8deg); }
+      30% { transform: rotate(14deg); }
+      40% { transform: rotate(-4deg); }
+      50%, 100% { transform: rotate(0deg); }
+    }
+
+    .empty-state .empty-title {
+      font-size: 20px;
+      font-weight: 600;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .empty-state .empty-subtitle {
+      font-size: 14px;
+      color: var(--text-muted);
+      text-align: center;
+      max-width: 280px;
     }
 
     .empty-state svg {
@@ -1425,10 +1522,9 @@
     function showEmptyState() {
       messagesDiv.innerHTML = `
         <div class="empty-state">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-          </svg>
-          <p>Start a conversation with your AI assistant.<br>I remember everything across sessions.</p>
+          <div class="empty-emoji">👋</div>
+          <div class="empty-title">hey! what's up?</div>
+          <div class="empty-subtitle">i remember everything, so just pick up where we left off ✨</div>
         </div>
       `;
     }

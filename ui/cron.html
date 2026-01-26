@@ -17,13 +17,14 @@
       --text-primary: #fafafa;
       --text-secondary: #a1a1a6;
       --text-muted: #636366;
-      --accent: #6366f1;
-      --accent-hover: #818cf8;
+      --accent: #a855f7;
+      --accent-secondary: #ec4899;
+      --accent-hover: #c084fc;
       --success: #22c55e;
       --error: #ef4444;
       --warning: #f59e0b;
-      --radius: 12px;
-      --radius-sm: 8px;
+      --radius: 16px;
+      --radius-sm: 10px;
     }
 
     * {
@@ -54,6 +55,10 @@
       font-size: 18px;
       font-weight: 700;
       letter-spacing: -0.02em;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
     }
 
     .header-icon {
@@ -62,7 +67,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg-tertiary);
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(236, 72, 153, 0.2) 100%);
       border-radius: var(--radius-sm);
       color: var(--accent);
     }
@@ -135,7 +140,7 @@
 
     input:focus, select:focus, textarea:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+      box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.15), 0 0 20px rgba(168, 85, 247, 0.1);
     }
 
     input::placeholder, textarea::placeholder {
@@ -173,12 +178,19 @@
     }
 
     button.primary {
-      background: var(--accent);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
       color: white;
+      box-shadow: 0 2px 8px rgba(168, 85, 247, 0.25);
     }
 
     button.primary:hover {
-      background: var(--accent-hover);
+      background: linear-gradient(135deg, var(--accent-hover) 0%, var(--accent) 100%);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(168, 85, 247, 0.35);
+    }
+
+    button.primary:active {
+      transform: translateY(0);
     }
 
     button.secondary {
@@ -190,6 +202,12 @@
     button.secondary:hover {
       background: var(--border);
       color: var(--text-primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    button.secondary:active {
+      transform: translateY(0);
     }
 
     button.danger {
@@ -225,7 +243,7 @@
     }
 
     .cron-help code {
-      background: rgba(99, 102, 241, 0.1);
+      background: rgba(168, 85, 247, 0.1);
       color: var(--accent);
       padding: 2px 6px;
       border-radius: 4px;
@@ -272,12 +290,18 @@
     }
 
     .job-status {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
+      box-shadow: 0 0 12px var(--accent);
       flex-shrink: 0;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.9); }
     }
 
     .job-item.disabled .job-status {
