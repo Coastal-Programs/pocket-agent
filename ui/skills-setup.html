@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;">
+  <title>Skills - Pocket Agent</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #0a0a0b;
+      --bg-secondary: #141415;
+      --bg-tertiary: #1c1c1e;
+      --border: #2a2a2d;
+      --text-primary: #fafafa;
+      --text-secondary: #a1a1a6;
+      --text-muted: #636366;
+      --accent: #a855f7;
+      --accent-secondary: #ec4899;
+      --error: #ef4444;
+      --success: #22c55e;
+      --warning: #f59e0b;
+      --radius-sm: 10px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Sora', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    header {
+      background: var(--bg-secondary);
+      padding: 16px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stats {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-left: 12px;
+    }
+
+    .stats span { margin-right: 12px; }
+    .stats .ready { color: var(--success); }
+    .stats .missing { color: var(--warning); }
+
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    button {
+      padding: 6px 14px;
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--border);
+      color: var(--text-primary);
+    }
+
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    button.primary:hover:not(:disabled) {
+      background: var(--accent-secondary);
+      border-color: var(--accent-secondary);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .filters {
+      padding: 12px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 6px;
+      background: var(--bg-secondary);
+    }
+
+    .filter {
+      padding: 5px 10px;
+      font-size: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .filter:hover { color: var(--text-secondary); }
+    .filter.active { background: var(--bg-tertiary); color: var(--text-primary); }
+
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      contain: layout style;
+    }
+
+    .content::-webkit-scrollbar { width: 8px; }
+    .content::-webkit-scrollbar-track { background: var(--bg-primary); }
+    .content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px 16px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background: var(--bg-secondary);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-secondary);
+      position: sticky;
+      top: 0;
+    }
+
+    td { font-size: 13px; }
+
+    tr:hover { background: var(--bg-secondary); }
+
+    .name {
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .name span { font-size: 16px; }
+
+    .deps {
+      color: var(--text-muted);
+      font-family: 'SF Mono', monospace;
+      font-size: 12px;
+    }
+
+    .deps.missing { color: var(--warning); }
+
+    .status {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .status.ready { background: rgba(34, 197, 94, 0.15); color: var(--success); }
+    .status.needs { background: rgba(245, 158, 11, 0.15); color: var(--warning); }
+    .status.na { background: rgba(99, 99, 102, 0.1); color: var(--text-muted); }
+
+    .actions { width: 100px; text-align: right; }
+
+    .actions button {
+      padding: 4px 10px;
+      font-size: 12px;
+      min-width: 70px;
+    }
+
+    .actions .installing {
+      background: transparent;
+      border-color: var(--accent);
+      color: var(--accent);
+      cursor: default;
+    }
+
+    .actions .done {
+      background: transparent;
+      border-color: var(--success);
+      color: var(--success);
+      cursor: default;
+    }
+
+    .actions .failed {
+      background: transparent;
+      border-color: var(--error);
+      color: var(--error);
+      cursor: default;
+    }
+
+    .empty {
+      text-align: center;
+      padding: 60px 24px;
+      color: var(--text-muted);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 16px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.2s;
+      z-index: 100;
+    }
+
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-color: var(--success); }
+    .toast.error { border-color: var(--error); }
+  </style>
+</head>
+<body>
+  <header>
+    <div style="display: flex; align-items: center;">
+      <h1>Skills</h1>
+      <div class="stats" id="stats"></div>
+    </div>
+    <div class="header-actions">
+      <button onclick="load()">Refresh</button>
+      <button class="primary" id="install-btn" onclick="installAll()" disabled>Install All</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <button class="filter active" data-f="all" onclick="filter('all')">All</button>
+    <button class="filter" data-f="ready" onclick="filter('ready')">Ready</button>
+    <button class="filter" data-f="missing" onclick="filter('missing')">Need Install</button>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty">Loading...</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let data = [];
+    let view = 'all';
+    let installing = false;
+
+    const emojis = {
+      '1password':'🔐','apple-notes':'📝','apple-reminders':'⏰','bear-notes':'🐻','bird':'🐦',
+      'blogwatcher':'📰','camsnap':'📷','clawdhub':'🦞','coding-agent':'💻','discord':'🎮',
+      'food-order':'🍕','gemini':'♊','gifgrep':'🎬','github':'🐙','himalaya':'📧','imsg':'💬',
+      'notion':'📔','obsidian':'💎','openhue':'💡','peekaboo':'👀','slack':'💼','sonoscli':'🔊',
+      'spotify-player':'🎧','summarize':'📝','things-mac':'✅','tmux':'🖥️','trello':'📋',
+      'wacli':'📱','weather':'🌤️'
+    };
+
+    async function load() {
+      try {
+        const r = await window.pocketAgent.getSkillsStatus();
+        data = r.skills;
+        document.getElementById('stats').innerHTML =
+          `<span class="ready">${r.summary.available} ready</span><span class="missing">${r.summary.unavailable} missing</span>`;
+        document.getElementById('install-btn').disabled = r.summary.unavailable === 0 || installing;
+        render();
+      } catch (e) {
+        document.getElementById('content').innerHTML = '<div class="empty">Failed to load</div>';
+      }
+    }
+
+    function render() {
+      const c = document.getElementById('content');
+      const list = data.filter(s => {
+        if (view === 'all') return true;
+        if (view === 'ready') return s.available;
+        if (view === 'missing') return !s.available && s.osCompatible;
+        return true;
+      });
+
+      if (!list.length) {
+        c.innerHTML = '<div class="empty">No skills match</div>';
+        return;
+      }
+
+      c.innerHTML = `<table>
+        <thead><tr><th>Skill</th><th>Dependencies</th><th>Status</th><th></th></tr></thead>
+        <tbody>${list.map(s => {
+          const e = emojis[s.name] || '🔧';
+          const st = s.available ? 'ready' : (s.osCompatible ? 'needs' : 'na');
+          const stTxt = s.available ? 'Ready' : (s.osCompatible ? 'Install' : 'N/A');
+          const deps = s.missingBins.length ? s.missingBins.join(', ') : (s.available ? '—' : 'none');
+          const depsClass = s.missingBins.length ? 'missing' : '';
+          const canInstall = !s.available && s.osCompatible && s.installOptions.length;
+          const btn = canInstall
+            ? `<button id="btn-${s.name}" onclick="install('${s.name}')">Install</button>` : '';
+          return `<tr id="row-${s.name}">
+            <td class="name"><span>${e}</span>${esc(s.name)}</td>
+            <td class="deps ${depsClass}">${esc(deps)}</td>
+            <td id="status-${s.name}"><span class="status ${st}">${stTxt}</span></td>
+            <td class="actions">${btn}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    }
+
+    function filter(f) {
+      view = f;
+      document.querySelectorAll('.filter').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+      render();
+    }
+
+    function setButtonState(name, state) {
+      const btn = document.getElementById(`btn-${name}`);
+      if (!btn) return;
+
+      btn.className = state;
+      btn.disabled = true;
+      btn.onclick = null;
+
+      switch(state) {
+        case 'installing':
+          btn.textContent = 'Installing...';
+          break;
+        case 'done':
+          btn.textContent = '✓ Done';
+          break;
+        case 'failed':
+          btn.textContent = '✗ Failed';
+          break;
+      }
+    }
+
+    function updateRowStatus(name, available) {
+      const statusCell = document.getElementById(`status-${name}`);
+      if (statusCell) {
+        statusCell.innerHTML = available
+          ? '<span class="status ready">Ready</span>'
+          : '<span class="status needs">Install</span>';
+      }
+    }
+
+    async function install(name) {
+      if (installing) return;
+      installing = true;
+      document.getElementById('install-btn').disabled = true;
+
+      setButtonState(name, 'installing');
+
+      try {
+        const r = await window.pocketAgent.installSkillDeps(name);
+        if (r.success) {
+          setButtonState(name, 'done');
+          updateRowStatus(name, true);
+          updateStats();
+          toast('Installed ' + name, 'success');
+        } else {
+          setButtonState(name, 'failed');
+          toast('Failed: ' + r.failed.join(', '), 'error');
+        }
+      } catch (e) {
+        setButtonState(name, 'failed');
+        toast(e.message, 'error');
+      }
+
+      installing = false;
+      document.getElementById('install-btn').disabled = false;
+    }
+
+    async function installAll() {
+      if (installing) return;
+      installing = true;
+      document.getElementById('install-btn').disabled = true;
+
+      const todo = data.filter(s => !s.available && s.osCompatible && s.installOptions.length);
+      if (!todo.length) {
+        installing = false;
+        return;
+      }
+
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const s of todo) {
+        setButtonState(s.name, 'installing');
+
+        try {
+          const r = await window.pocketAgent.installSkillDeps(s.name);
+          if (r.success) {
+            setButtonState(s.name, 'done');
+            updateRowStatus(s.name, true);
+            successCount++;
+          } else {
+            setButtonState(s.name, 'failed');
+            failCount++;
+          }
+        } catch (e) {
+          setButtonState(s.name, 'failed');
+          failCount++;
+        }
+      }
+
+      installing = false;
+      updateStats();
+
+      if (failCount === 0) {
+        toast(`Installed ${successCount} skills`, 'success');
+      } else {
+        toast(`${successCount} installed, ${failCount} failed`, 'error');
+      }
+
+      document.getElementById('install-btn').disabled = true;
+    }
+
+    async function updateStats() {
+      try {
+        const r = await window.pocketAgent.getSkillsStatus();
+        data = r.skills;
+        document.getElementById('stats').innerHTML =
+          `<span class="ready">${r.summary.available} ready</span><span class="missing">${r.summary.unavailable} missing</span>`;
+        document.getElementById('install-btn').disabled = r.summary.unavailable === 0 || installing;
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    function toast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + (type || '');
+      setTimeout(() => t.classList.remove('show'), 2500);
+    }
+
+    function esc(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    load();
+  </script>
+</body>
+</html>

@@ -35,6 +35,7 @@ type SDKOptions = {
   persistSession?: boolean;
   systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
   mcpServers?: Record<string, unknown>;
+  settingSources?: ('project' | 'user')[];  // Load skills from .claude/skills/
 };
 
 // Dynamic SDK loader
@@ -284,9 +285,11 @@ class AgentManagerClass extends EventEmitter {
       maxTurns: 20,
       abortController: this.currentAbortController || new AbortController(),
       tools: { type: 'preset', preset: 'claude_code' },
+      settingSources: ['project'],  // Load skills from .claude/skills/
       allowedTools: [
         // Built-in SDK tools
         'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
+        'Skill',  // Enable skills from .claude/skills/
         // Custom MCP tools - browser & system
         'mcp__pocket-agent__browser',
         'mcp__pocket-agent__notify',

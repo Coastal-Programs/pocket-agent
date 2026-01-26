@@ -122,6 +122,7 @@ let setupWindow: BrowserWindow | null = null;
 let factsGraphWindow: BrowserWindow | null = null;
 let customizeWindow: BrowserWindow | null = null;
 let factsWindow: BrowserWindow | null = null;
+let skillsSetupWindow: BrowserWindow | null = null;
 
 /**
  * Get the agent's isolated workspace directory.
@@ -136,7 +137,7 @@ function getAgentWorkspace(): string {
 /**
  * Ensure the agent workspace directory exists.
  * Creates it if missing (on first run, after onboarding, or if deleted).
- * Sets up CLAUDE.md for the SDK to load.
+ * Sets up CLAUDE.md and .claude/skills for the SDK to load.
  */
 function ensureAgentWorkspace(): string {
   const workspace = getAgentWorkspace();
@@ -144,6 +145,34 @@ function ensureAgentWorkspace(): string {
   if (!fs.existsSync(workspace)) {
     console.log('[Main] Creating agent workspace:', workspace);
     fs.mkdirSync(workspace, { recursive: true });
+  }
+
+  // Ensure .claude folder is symlinked from source (for skills and commands)
+  const workspaceClaudeDir = path.join(workspace, '.claude');
+  const sourceClaudeDir = path.join(__dirname, '../../.claude');
+
+  if (fs.existsSync(sourceClaudeDir)) {
+    try {
+      if (!fs.existsSync(workspaceClaudeDir)) {
+        // Create symlink to source .claude folder
+        fs.symlinkSync(sourceClaudeDir, workspaceClaudeDir, 'dir');
+        console.log('[Main] Symlinked .claude folder to workspace');
+      } else {
+        // Check if it's already a symlink
+        const stats = fs.lstatSync(workspaceClaudeDir);
+        if (!stats.isSymbolicLink()) {
+          // Workspace has its own .claude folder - symlink skills subfolder instead
+          const workspaceSkillsDir = path.join(workspaceClaudeDir, 'skills');
+          const sourceSkillsDir = path.join(sourceClaudeDir, 'skills');
+          if (!fs.existsSync(workspaceSkillsDir) && fs.existsSync(sourceSkillsDir)) {
+            fs.symlinkSync(sourceSkillsDir, workspaceSkillsDir, 'dir');
+            console.log('[Main] Symlinked skills folder to workspace');
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[Main] Failed to setup .claude symlink:', err);
+    }
   }
 
   // Always ensure CLAUDE.md exists (recreate if deleted)
@@ -357,6 +386,10 @@ function updateTrayMenu(): void {
       label: 'Settings...',
       click: () => openSettingsWindow(),
       accelerator: 'CmdOrCtrl+,',
+    },
+    {
+      label: 'Skills Setup...',
+      click: () => createSkillsSetupWindow(),
     },
     { type: 'separator' },
     {
@@ -643,6 +676,35 @@ function openFactsWindow(): void {
 
   factsWindow.on('closed', () => {
     factsWindow = null;
+  });
+}
+
+function createSkillsSetupWindow(): void {
+  if (skillsSetupWindow && !skillsSetupWindow.isDestroyed()) {
+    skillsSetupWindow.focus();
+    return;
+  }
+
+  skillsSetupWindow = new BrowserWindow({
+    width: 900,
+    height: 700,
+    title: 'Skills Setup - Pocket Agent',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+    show: false,
+  });
+
+  skillsSetupWindow.loadFile(path.join(__dirname, '../../ui/skills-setup.html'));
+
+  skillsSetupWindow.once('ready-to-show', () => {
+    skillsSetupWindow?.show();
+  });
+
+  skillsSetupWindow.on('closed', () => {
+    skillsSetupWindow = null;
   });
 }
 
@@ -968,6 +1030,65 @@ function setupIPC(): void {
       console.error('[Attachment] Save failed:', errorMsg);
       throw error;
     }
+  });
+
+  // Skills
+  ipcMain.handle('skills:getStatus', async () => {
+    const {
+      loadSkillsManifest,
+      getAllSkillStatuses,
+      getSkillsSummary,
+      checkPrerequisites,
+    } = await import('../skills');
+
+    const projectRoot = app.isPackaged
+      ? path.join(process.resourcesPath, 'app')
+      : path.join(__dirname, '../..');
+    const skillsDir = path.join(projectRoot, '.claude');
+
+    const manifest = loadSkillsManifest(skillsDir);
+    if (!manifest) {
+      return {
+        skills: [],
+        summary: { total: 0, available: 0, unavailable: 0, incompatible: 0 },
+        prerequisites: checkPrerequisites(),
+      };
+    }
+
+    const skills = getAllSkillStatuses(manifest);
+    const summary = getSkillsSummary(manifest);
+    const prerequisites = checkPrerequisites();
+
+    return { skills, summary, prerequisites };
+  });
+
+  ipcMain.handle('skills:install', async (_, skillName: string) => {
+    const {
+      loadSkillsManifest,
+      getSkillStatus,
+      installSkillDependencies,
+    } = await import('../skills');
+
+    const projectRoot = app.isPackaged
+      ? path.join(process.resourcesPath, 'app')
+      : path.join(__dirname, '../..');
+    const skillsDir = path.join(projectRoot, '.claude');
+
+    const manifest = loadSkillsManifest(skillsDir);
+    if (!manifest || !manifest.skills[skillName]) {
+      return { success: false, installed: [], failed: ['Skill not found'] };
+    }
+
+    const status = getSkillStatus(skillName, manifest.skills[skillName]);
+    const result = await installSkillDependencies(status, (msg) => {
+      console.log(`[Skills] ${skillName}: ${msg}`);
+    });
+
+    return result;
+  });
+
+  ipcMain.handle('app:openSkillsSetup', async () => {
+    createSkillsSetupWindow();
   });
 }
 

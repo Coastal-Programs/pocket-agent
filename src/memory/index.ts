@@ -614,8 +614,14 @@ export class MemoryManager {
   async searchFactsHybrid(query: string): Promise<SearchResult[]> {
     const results: Map<number, SearchResult> = new Map();
 
+    // Determine weights based on whether embeddings are available
+    const embeddingsAvailable = hasEmbeddings();
+    const vectorWeight = embeddingsAvailable ? VECTOR_WEIGHT : 0;
+    const keywordWeight = embeddingsAvailable ? KEYWORD_WEIGHT : 1.0; // 100% weight when no embeddings
+    const scoreThreshold = embeddingsAvailable ? MIN_SCORE_THRESHOLD : 0.15; // Lower threshold for keyword-only
+
     // 1. Vector search (if embeddings available)
-    if (hasEmbeddings()) {
+    if (embeddingsAvailable) {
       try {
         const queryEmbedding = await embed(query);
 
@@ -650,7 +656,7 @@ export class MemoryManager {
 
           results.set(chunk.id, {
             fact,
-            score: similarity * VECTOR_WEIGHT,
+            score: similarity * vectorWeight,
             vectorScore: similarity,
             keywordScore: 0,
           });
@@ -684,7 +690,7 @@ export class MemoryManager {
 
           if (existing) {
             existing.keywordScore = normalizedScore;
-            existing.score += normalizedScore * KEYWORD_WEIGHT;
+            existing.score += normalizedScore * keywordWeight;
           } else {
             const fact: Fact = {
               id: ftsResult.id,
@@ -697,7 +703,7 @@ export class MemoryManager {
 
             results.set(ftsResult.id, {
               fact,
-              score: normalizedScore * KEYWORD_WEIGHT,
+              score: normalizedScore * keywordWeight,
               vectorScore: 0,
               keywordScore: normalizedScore,
             });
@@ -710,7 +716,7 @@ export class MemoryManager {
 
     // 3. Sort by score and filter
     const sortedResults = Array.from(results.values())
-      .filter(r => r.score >= MIN_SCORE_THRESHOLD)
+      .filter(r => r.score >= scoreThreshold)
       .sort((a, b) => b.score - a.score)
       .slice(0, MAX_SEARCH_RESULTS);
 

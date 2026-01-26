@@ -75,6 +75,11 @@ contextBridge.exposeInMainWorld('pocketAgent', {
   completeOAuth: (code: string) => ipcRenderer.invoke('auth:completeOAuth', code),
   cancelOAuth: () => ipcRenderer.invoke('auth:cancelOAuth'),
   isOAuthPending: () => ipcRenderer.invoke('auth:isOAuthPending'),
+
+  // Skills
+  getSkillsStatus: () => ipcRenderer.invoke('skills:getStatus'),
+  installSkillDeps: (skillName: string) => ipcRenderer.invoke('skills:install', skillName),
+  openSkillsSetup: () => ipcRenderer.invoke('app:openSkillsSetup'),
 });
 
 // Type declarations for renderer
@@ -135,6 +140,20 @@ declare global {
       completeOAuth: (code: string) => Promise<{ success: boolean; error?: string }>;
       cancelOAuth: () => Promise<{ success: boolean }>;
       isOAuthPending: () => Promise<boolean>;
+      // Skills
+      getSkillsStatus: () => Promise<{
+        skills: Array<{
+          name: string;
+          available: boolean;
+          missingBins: string[];
+          osCompatible: boolean;
+          installOptions: Array<{ id: string; kind: string; label: string; bins?: string[] }>;
+        }>;
+        summary: { total: number; available: number; unavailable: number; incompatible: number };
+        prerequisites: { brew: boolean; go: boolean; node: boolean; uv: boolean; git: boolean };
+      }>;
+      installSkillDeps: (skillName: string) => Promise<{ success: boolean; installed: string[]; failed: string[] }>;
+      openSkillsSetup: () => Promise<void>;
     };
   }
 }

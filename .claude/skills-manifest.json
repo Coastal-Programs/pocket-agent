@@ -1,0 +1,367 @@
+{
+  "version": "1.0.0",
+  "generated": "2026-01-26",
+  "source": "clawdbot/clawdbot",
+  "skills": {
+    "1password": {
+      "bins": ["op"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "1password-cli", "bins": ["op"], "label": "Install 1Password CLI (brew)"}
+      ]
+    },
+    "apple-notes": {
+      "bins": ["memo"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "antoniorodr/memo/memo", "bins": ["memo"], "label": "Install memo via Homebrew"}
+      ]
+    },
+    "apple-reminders": {
+      "bins": ["remindctl"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/remindctl", "bins": ["remindctl"], "label": "Install remindctl via Homebrew"}
+      ]
+    },
+    "bear-notes": {
+      "bins": ["grizzly"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/tylerwince/grizzly/cmd/grizzly@latest", "bins": ["grizzly"], "label": "Install grizzly (go)"}
+      ]
+    },
+    "bird": {
+      "bins": ["bird"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/bird", "bins": ["bird"], "label": "Install bird (brew)", "os": ["darwin"]},
+        {"id": "npm", "kind": "node", "package": "@steipete/bird", "bins": ["bird"], "label": "Install bird (npm)"}
+      ]
+    },
+    "blogwatcher": {
+      "bins": ["blogwatcher"],
+      "os": [],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/Hyaxia/blogwatcher/cmd/blogwatcher@latest", "bins": ["blogwatcher"], "label": "Install blogwatcher (go)"}
+      ]
+    },
+    "blucli": {
+      "bins": ["blu"],
+      "os": [],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/steipete/blucli/cmd/blu@latest", "bins": ["blu"], "label": "Install blucli (go)"}
+      ]
+    },
+    "camsnap": {
+      "bins": ["camsnap"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/camsnap", "bins": ["camsnap"], "label": "Install camsnap (brew)"}
+      ]
+    },
+    "clawdhub": {
+      "bins": ["clawdhub"],
+      "os": [],
+      "install": [
+        {"id": "node", "kind": "node", "package": "clawdhub", "bins": ["clawdhub"], "label": "Install ClawdHub CLI (npm)"}
+      ]
+    },
+    "coding-agent": {
+      "bins": [],
+      "os": [],
+      "install": []
+    },
+    "discord": {
+      "bins": [],
+      "os": [],
+      "install": [],
+      "requires_config": ["channels.discord"]
+    },
+    "eightctl": {
+      "bins": ["eightctl"],
+      "os": [],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/steipete/eightctl/cmd/eightctl@latest", "bins": ["eightctl"], "label": "Install eightctl (go)"}
+      ]
+    },
+    "food-order": {
+      "bins": ["ordercli"],
+      "os": [],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/steipete/ordercli/cmd/ordercli@latest", "bins": ["ordercli"], "label": "Install ordercli (go)"}
+      ]
+    },
+    "gemini": {
+      "bins": ["gemini"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "gemini-cli", "bins": ["gemini"], "label": "Install Gemini CLI (brew)"}
+      ]
+    },
+    "gifgrep": {
+      "bins": ["gifgrep"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/gifgrep", "bins": ["gifgrep"], "label": "Install gifgrep (brew)"},
+        {"id": "go", "kind": "go", "module": "github.com/steipete/gifgrep/cmd/gifgrep@latest", "bins": ["gifgrep"], "label": "Install gifgrep (go)"}
+      ]
+    },
+    "github": {
+      "bins": ["gh"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "gh", "bins": ["gh"], "label": "Install GitHub CLI (brew)"},
+        {"id": "apt", "kind": "apt", "package": "gh", "bins": ["gh"], "label": "Install GitHub CLI (apt)"}
+      ]
+    },
+    "gog": {
+      "bins": ["gog"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/gogcli", "bins": ["gog"], "label": "Install gog (brew)"}
+      ]
+    },
+    "goplaces": {
+      "bins": ["goplaces"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/goplaces", "bins": ["goplaces"], "label": "Install goplaces (brew)"}
+      ]
+    },
+    "himalaya": {
+      "bins": ["himalaya"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "himalaya", "bins": ["himalaya"], "label": "Install Himalaya (brew)"}
+      ]
+    },
+    "imsg": {
+      "bins": ["imsg"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/imsg", "bins": ["imsg"], "label": "Install imsg (brew)"}
+      ]
+    },
+    "local-places": {
+      "bins": ["uv"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "uv", "bins": ["uv"], "label": "Install uv (brew)"}
+      ]
+    },
+    "mcporter": {
+      "bins": ["mcporter"],
+      "os": [],
+      "install": [
+        {"id": "node", "kind": "node", "package": "mcporter", "bins": ["mcporter"], "label": "Install mcporter (node)"}
+      ]
+    },
+    "model-usage": {
+      "bins": ["codexbar"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "brew-cask", "kind": "brew-cask", "cask": "steipete/tap/codexbar", "bins": ["codexbar"], "label": "Install CodexBar (brew cask)"}
+      ]
+    },
+    "nano-banana-pro": {
+      "bins": ["uv"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "uv", "bins": ["uv"], "label": "Install uv (brew)"}
+      ]
+    },
+    "nano-pdf": {
+      "bins": ["nano-pdf"],
+      "os": [],
+      "install": [
+        {"id": "uv", "kind": "uv", "package": "nano-pdf", "bins": ["nano-pdf"], "label": "Install nano-pdf (uv)"}
+      ]
+    },
+    "notion": {
+      "bins": [],
+      "os": [],
+      "install": [],
+      "requires_config": ["notion_api_key"]
+    },
+    "obsidian": {
+      "bins": ["obsidian-cli"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "yakitrak/yakitrak/obsidian-cli", "bins": ["obsidian-cli"], "label": "Install obsidian-cli (brew)"}
+      ]
+    },
+    "openai-image-gen": {
+      "bins": ["python3"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "python", "bins": ["python3"], "label": "Install Python (brew)"}
+      ],
+      "requires_config": ["openai_api_key"]
+    },
+    "openai-whisper-api": {
+      "bins": ["curl"],
+      "os": [],
+      "install": [],
+      "requires_config": ["openai_api_key"]
+    },
+    "openai-whisper": {
+      "bins": ["whisper"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "openai-whisper", "bins": ["whisper"], "label": "Install OpenAI Whisper (brew)"}
+      ]
+    },
+    "openhue": {
+      "bins": ["openhue"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "openhue/cli/openhue-cli", "bins": ["openhue"], "label": "Install OpenHue CLI (brew)"}
+      ]
+    },
+    "oracle": {
+      "bins": ["oracle"],
+      "os": [],
+      "install": [
+        {"id": "node", "kind": "node", "package": "@steipete/oracle", "bins": ["oracle"], "label": "Install oracle (node)"}
+      ]
+    },
+    "ordercli": {
+      "bins": ["ordercli"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/ordercli", "bins": ["ordercli"], "label": "Install ordercli (brew)"},
+        {"id": "go", "kind": "go", "module": "github.com/steipete/ordercli/cmd/ordercli@latest", "bins": ["ordercli"], "label": "Install ordercli (go)"}
+      ]
+    },
+    "peekaboo": {
+      "bins": ["peekaboo"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/peekaboo", "bins": ["peekaboo"], "label": "Install Peekaboo (brew)"}
+      ]
+    },
+    "sag": {
+      "bins": ["sag"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/sag", "bins": ["sag"], "label": "Install sag (brew)"}
+      ]
+    },
+    "session-logs": {
+      "bins": ["jq", "rg"],
+      "os": [],
+      "install": [
+        {"id": "brew-jq", "kind": "brew", "formula": "jq", "bins": ["jq"], "label": "Install jq (brew)"},
+        {"id": "brew-rg", "kind": "brew", "formula": "ripgrep", "bins": ["rg"], "label": "Install ripgrep (brew)"}
+      ]
+    },
+    "sherpa-onnx-tts": {
+      "bins": [],
+      "os": ["darwin", "linux", "win32"],
+      "install": [
+        {"id": "download-runtime-macos", "kind": "download", "os": ["darwin"], "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.23/sherpa-onnx-v1.12.23-osx-universal2-shared.tar.bz2", "label": "Download sherpa-onnx runtime (macOS)"},
+        {"id": "download-runtime-linux", "kind": "download", "os": ["linux"], "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v1.12.23/sherpa-onnx-v1.12.23-linux-x64-shared.tar.bz2", "label": "Download sherpa-onnx runtime (Linux)"}
+      ]
+    },
+    "skill-creator": {
+      "bins": [],
+      "os": [],
+      "install": []
+    },
+    "slack": {
+      "bins": [],
+      "os": [],
+      "install": [],
+      "requires_config": ["channels.slack"]
+    },
+    "songsee": {
+      "bins": ["songsee"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/songsee", "bins": ["songsee"], "label": "Install songsee (brew)"}
+      ]
+    },
+    "sonoscli": {
+      "bins": ["sonos"],
+      "os": [],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/steipete/sonoscli/cmd/sonos@latest", "bins": ["sonos"], "label": "Install sonoscli (go)"}
+      ]
+    },
+    "spotify-player": {
+      "bins": ["spogo"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/spogo", "bins": ["spogo"], "label": "Install spogo (brew)"},
+        {"id": "brew-alt", "kind": "brew", "formula": "spotify_player", "bins": ["spotify_player"], "label": "Install spotify_player (brew)"}
+      ]
+    },
+    "summarize": {
+      "bins": ["summarize"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/summarize", "bins": ["summarize"], "label": "Install summarize (brew)"}
+      ]
+    },
+    "things-mac": {
+      "bins": ["things"],
+      "os": ["darwin"],
+      "install": [
+        {"id": "go", "kind": "go", "module": "github.com/ossianhempel/things3-cli/cmd/things@latest", "bins": ["things"], "label": "Install things3-cli (go)"}
+      ]
+    },
+    "tmux": {
+      "bins": ["tmux"],
+      "os": ["darwin", "linux"],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "tmux", "bins": ["tmux"], "label": "Install tmux (brew)"}
+      ]
+    },
+    "trello": {
+      "bins": ["jq"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "jq", "bins": ["jq"], "label": "Install jq (brew)"}
+      ],
+      "requires_config": ["trello_api_key"]
+    },
+    "video-frames": {
+      "bins": ["ffmpeg"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "ffmpeg", "bins": ["ffmpeg"], "label": "Install ffmpeg (brew)"}
+      ]
+    },
+    "voice-call": {
+      "bins": [],
+      "os": [],
+      "install": [],
+      "requires_config": ["voice_call_plugin"]
+    },
+    "wacli": {
+      "bins": ["wacli"],
+      "os": [],
+      "install": [
+        {"id": "brew", "kind": "brew", "formula": "steipete/tap/wacli", "bins": ["wacli"], "label": "Install wacli (brew)"},
+        {"id": "go", "kind": "go", "module": "github.com/steipete/wacli/cmd/wacli@latest", "bins": ["wacli"], "label": "Install wacli (go)"}
+      ]
+    },
+    "weather": {
+      "bins": ["curl"],
+      "os": [],
+      "install": []
+    },
+    "bluebubbles": {
+      "bins": [],
+      "os": [],
+      "install": [],
+      "requires_config": ["bluebubbles_server"]
+    },
+    "canvas": {
+      "bins": [],
+      "os": [],
+      "install": []
+    }
+  }
+}
