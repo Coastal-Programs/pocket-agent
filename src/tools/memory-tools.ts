@@ -293,6 +293,64 @@ export async function handleMemorySearchTool(input: unknown): Promise<string> {
 }
 
 /**
+ * Daily log tool definition
+ */
+export function getDailyLogToolDefinition() {
+  return {
+    name: 'daily_log',
+    description: `Add an entry to today's daily log. The daily log is a journal of activities and events throughout the day.
+
+Use this to record:
+- Significant conversations or topics discussed
+- Tasks completed or started
+- User's mood or state if mentioned
+- Key decisions or events
+- Reminders triggered
+
+This helps maintain continuity across sessions and provides context about what happened during the day.
+
+Examples:
+- daily_log("Discussed project deadline - moved to next Friday")
+- daily_log("User completed the website redesign task")
+- daily_log("Morning check-in - user mentioned feeling tired")`,
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        entry: {
+          type: 'string',
+          description: 'The log entry to add (will be timestamped automatically)',
+        },
+      },
+      required: ['entry'],
+    },
+  };
+}
+
+/**
+ * Daily log tool handler
+ */
+export async function handleDailyLogTool(input: unknown): Promise<string> {
+  if (!memoryManager) {
+    return JSON.stringify({ error: 'Memory not initialized' });
+  }
+
+  const { entry } = input as { entry: string };
+
+  if (!entry || entry.trim().length === 0) {
+    return JSON.stringify({ error: 'Entry is required' });
+  }
+
+  const log = memoryManager.appendToDailyLog(entry.trim());
+  console.log(`[DailyLog] Added: ${entry.trim()}`);
+
+  return JSON.stringify({
+    success: true,
+    message: 'Entry added to daily log',
+    date: log.date,
+  });
+}
+
+/**
  * Get all memory tools
  */
 export function getMemoryTools() {
@@ -312,6 +370,10 @@ export function getMemoryTools() {
     {
       ...getMemorySearchToolDefinition(),
       handler: handleMemorySearchTool,
+    },
+    {
+      ...getDailyLogToolDefinition(),
+      handler: handleDailyLogTool,
     },
   ];
 }

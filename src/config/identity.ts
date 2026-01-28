@@ -1,7 +1,7 @@
 /**
  * Identity configuration
  *
- * Loads agent identity from ~/.my-assistant/identity.md
+ * Loads agent identity from ~/Documents/Pocket-agent/identity.md
  * This defines the agent's name, personality, and core info about the user.
  */
 
@@ -9,8 +9,13 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const IDENTITY_DIR = path.join(os.homedir(), '.my-assistant');
+// New location in workspace folder
+const IDENTITY_DIR = path.join(os.homedir(), 'Documents', 'Pocket-agent');
 const IDENTITY_FILE = path.join(IDENTITY_DIR, 'identity.md');
+
+// Old location for migration
+const OLD_IDENTITY_DIR = path.join(os.homedir(), '.my-assistant');
+const OLD_IDENTITY_FILE = path.join(OLD_IDENTITY_DIR, 'identity.md');
 
 const DEFAULT_IDENTITY = `# Agent Identity
 
@@ -36,6 +41,7 @@ Talk like you're texting your best friend. Chill, casual, no corporate speak.
 
 /**
  * Load identity from file, create default if missing
+ * Migrates from old location (~/.my-assistant/) if needed
  */
 export function loadIdentity(): string {
   try {
@@ -43,6 +49,14 @@ export function loadIdentity(): string {
     if (!fs.existsSync(IDENTITY_DIR)) {
       fs.mkdirSync(IDENTITY_DIR, { recursive: true });
       console.log('[Identity] Created directory:', IDENTITY_DIR);
+    }
+
+    // Migrate from old location if exists and new doesn't
+    if (!fs.existsSync(IDENTITY_FILE) && fs.existsSync(OLD_IDENTITY_FILE)) {
+      const oldContent = fs.readFileSync(OLD_IDENTITY_FILE, 'utf-8');
+      fs.writeFileSync(IDENTITY_FILE, oldContent);
+      console.log('[Identity] Migrated from:', OLD_IDENTITY_FILE);
+      console.log('[Identity] New location:', IDENTITY_FILE);
     }
 
     // Load or create identity file

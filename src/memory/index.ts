@@ -9,12 +9,20 @@ import {
 } from './embeddings';
 
 // Types
+export interface Session {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Message {
   id: number;
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
   token_count?: number;
+  session_id?: string;
 }
 
 export interface Fact {
@@ -75,6 +83,13 @@ export interface GraphData {
   links: GraphLink[];
 }
 
+export interface DailyLog {
+  id: number;
+  date: string;
+  content: string;
+  updated_at: string;
+}
+
 // Summarizer function type - injected to avoid circular dependency with agent
 export type SummarizerFn = (messages: Message[]) => Promise<string>;
 
@@ -108,13 +123,22 @@ export class MemoryManager {
 
   private initialize(): void {
     this.db.exec(`
-      -- Main conversation messages (ONE persistent conversation)
+      -- Sessions for isolated conversation threads
+      CREATE TABLE IF NOT EXISTS sessions (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        created_at TEXT DEFAULT (datetime('now')),
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
+      -- Main conversation messages (per-session)
       CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
         content TEXT NOT NULL,
         timestamp TEXT DEFAULT (datetime('now')),
-        token_count INTEGER
+        token_count INTEGER,
+        session_id TEXT REFERENCES sessions(id)
       );
 
       -- Facts extracted from conversations (long-term memory)
@@ -159,13 +183,14 @@ export class MemoryManager {
         updated_at TEXT DEFAULT (datetime('now'))
       );
 
-      -- Summaries of older conversation chunks
+      -- Summaries of older conversation chunks (per-session)
       CREATE TABLE IF NOT EXISTS summaries (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         start_message_id INTEGER NOT NULL,
         end_message_id INTEGER NOT NULL,
         content TEXT NOT NULL,
         token_count INTEGER,
+        session_id TEXT REFERENCES sessions(id),
         created_at TEXT DEFAULT (datetime('now'))
       );
 
@@ -200,15 +225,26 @@ export class MemoryManager {
         updated_at TEXT DEFAULT (datetime('now'))
       );
 
+      -- Daily logs for memory journaling (global across all sessions)
+      CREATE TABLE IF NOT EXISTS daily_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        date TEXT UNIQUE NOT NULL,
+        content TEXT NOT NULL,
+        updated_at TEXT DEFAULT (datetime('now'))
+      );
+
       -- Indexes for performance
       CREATE INDEX IF NOT EXISTS idx_messages_timestamp ON messages(timestamp);
+      CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id, timestamp);
       CREATE INDEX IF NOT EXISTS idx_facts_category ON facts(category);
       CREATE INDEX IF NOT EXISTS idx_facts_subject ON facts(subject);
       CREATE INDEX IF NOT EXISTS idx_chunks_fact_id ON chunks(fact_id);
       CREATE INDEX IF NOT EXISTS idx_summaries_range ON summaries(start_message_id, end_message_id);
+      CREATE INDEX IF NOT EXISTS idx_summaries_session ON summaries(session_id);
       CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_time);
       CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
       CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+      CREATE INDEX IF NOT EXISTS idx_daily_logs_date ON daily_logs(date);
     `);
 
     // Create FTS5 virtual table for keyword search
@@ -255,6 +291,58 @@ export class MemoryManager {
     if (!hasSubject) {
       this.db.exec(`ALTER TABLE facts ADD COLUMN subject TEXT NOT NULL DEFAULT ''`);
       console.log('[Memory] Migrated facts table: added subject column');
+    }
+
+    // Migration: add session_id to messages if missing
+    const msgColumns = this.db.pragma('table_info(messages)') as Array<{ name: string }>;
+    const hasSessionId = msgColumns.some(c => c.name === 'session_id');
+    if (!hasSessionId) {
+      this.db.exec(`ALTER TABLE messages ADD COLUMN session_id TEXT REFERENCES sessions(id)`);
+      console.log('[Memory] Migrated messages table: added session_id column');
+    }
+
+    // Migration: add session_id to summaries if missing
+    const sumColumns = this.db.pragma('table_info(summaries)') as Array<{ name: string }>;
+    const sumHasSessionId = sumColumns.some(c => c.name === 'session_id');
+    if (!sumHasSessionId) {
+      this.db.exec(`ALTER TABLE summaries ADD COLUMN session_id TEXT REFERENCES sessions(id)`);
+      console.log('[Memory] Migrated summaries table: added session_id column');
+    }
+
+    // Migration: create default session and migrate orphan messages
+    this.migrateToDefaultSession();
+  }
+
+  /**
+   * Create default session and migrate existing messages without session_id
+   */
+  private migrateToDefaultSession(): void {
+    const DEFAULT_SESSION_ID = 'default';
+    const DEFAULT_SESSION_NAME = 'Chat';
+
+    // Check if default session exists
+    const existing = this.db.prepare('SELECT id FROM sessions WHERE id = ?').get(DEFAULT_SESSION_ID);
+    if (!existing) {
+      // Create default session
+      this.db.prepare(`
+        INSERT INTO sessions (id, name, created_at, updated_at)
+        VALUES (?, ?, datetime('now'), datetime('now'))
+      `).run(DEFAULT_SESSION_ID, DEFAULT_SESSION_NAME);
+      console.log('[Memory] Created default session');
+    }
+
+    // Migrate orphan messages (no session_id) to default session
+    const orphanCount = (this.db.prepare('SELECT COUNT(*) as c FROM messages WHERE session_id IS NULL').get() as { c: number }).c;
+    if (orphanCount > 0) {
+      this.db.prepare('UPDATE messages SET session_id = ? WHERE session_id IS NULL').run(DEFAULT_SESSION_ID);
+      console.log(`[Memory] Migrated ${orphanCount} messages to default session`);
+    }
+
+    // Migrate orphan summaries to default session
+    const orphanSumCount = (this.db.prepare('SELECT COUNT(*) as c FROM summaries WHERE session_id IS NULL').get() as { c: number }).c;
+    if (orphanSumCount > 0) {
+      this.db.prepare('UPDATE summaries SET session_id = ? WHERE session_id IS NULL').run(DEFAULT_SESSION_ID);
+      console.log(`[Memory] Migrated ${orphanSumCount} summaries to default session`);
     }
   }
 
@@ -352,37 +440,216 @@ export class MemoryManager {
     this.summarizer = fn;
   }
 
+  // ============ SESSION METHODS ============
+
+  /**
+   * Create a new session
+   */
+  createSession(name: string): Session {
+    const id = `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    this.db.prepare(`
+      INSERT INTO sessions (id, name, created_at, updated_at)
+      VALUES (?, ?, datetime('now'), datetime('now'))
+    `).run(id, name);
+
+    return this.getSession(id)!;
+  }
+
+  /**
+   * Get a session by ID
+   */
+  getSession(id: string): Session | null {
+    const row = this.db.prepare(`
+      SELECT id, name, created_at, updated_at
+      FROM sessions
+      WHERE id = ?
+    `).get(id) as Session | undefined;
+
+    return row || null;
+  }
+
+  /**
+   * Get all sessions, ordered by most recent activity
+   */
+  getSessions(): Session[] {
+    return this.db.prepare(`
+      SELECT id, name, created_at, updated_at
+      FROM sessions
+      ORDER BY updated_at DESC
+    `).all() as Session[];
+  }
+
+  /**
+   * Rename a session
+   */
+  renameSession(id: string, name: string): boolean {
+    const result = this.db.prepare(`
+      UPDATE sessions SET name = ?, updated_at = datetime('now')
+      WHERE id = ?
+    `).run(name, id);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Delete a session and all its messages/summaries
+   */
+  deleteSession(id: string): boolean {
+    // Don't allow deleting the default session
+    if (id === 'default') {
+      console.warn('[Memory] Cannot delete the default session');
+      return false;
+    }
+
+    // Delete messages first (due to foreign key)
+    this.db.prepare('DELETE FROM messages WHERE session_id = ?').run(id);
+    this.db.prepare('DELETE FROM summaries WHERE session_id = ?').run(id);
+    const result = this.db.prepare('DELETE FROM sessions WHERE id = ?').run(id);
+
+    return result.changes > 0;
+  }
+
+  /**
+   * Touch session (update updated_at timestamp)
+   */
+  touchSession(id: string): void {
+    this.db.prepare(`UPDATE sessions SET updated_at = datetime('now') WHERE id = ?`).run(id);
+  }
+
+  /**
+   * Get session message count
+   */
+  getSessionMessageCount(sessionId: string): number {
+    const row = this.db.prepare('SELECT COUNT(*) as c FROM messages WHERE session_id = ?').get(sessionId) as { c: number };
+    return row.c;
+  }
+
+  // ============ DAILY LOG METHODS ============
+
+  /**
+   * Get today's date in YYYY-MM-DD format
+   */
+  private getTodayDate(): string {
+    return new Date().toISOString().split('T')[0];
+  }
+
+  /**
+   * Get a daily log by date (defaults to today)
+   */
+  getDailyLog(date?: string): DailyLog | null {
+    const targetDate = date || this.getTodayDate();
+    const row = this.db.prepare(`
+      SELECT id, date, content, updated_at
+      FROM daily_logs
+      WHERE date = ?
+    `).get(targetDate) as DailyLog | undefined;
+
+    return row || null;
+  }
+
+  /**
+   * Append an entry to today's daily log
+   * Creates the log if it doesn't exist
+   */
+  appendToDailyLog(entry: string): DailyLog {
+    const today = this.getTodayDate();
+    const timestamp = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const formattedEntry = `[${timestamp}] ${entry}`;
+
+    const existing = this.getDailyLog(today);
+
+    if (existing) {
+      // Append to existing log
+      const newContent = existing.content + '\n' + formattedEntry;
+      this.db.prepare(`
+        UPDATE daily_logs
+        SET content = ?, updated_at = datetime('now')
+        WHERE date = ?
+      `).run(newContent, today);
+    } else {
+      // Create new log for today
+      this.db.prepare(`
+        INSERT INTO daily_logs (date, content, updated_at)
+        VALUES (?, ?, datetime('now'))
+      `).run(today, formattedEntry);
+    }
+
+    return this.getDailyLog(today)!;
+  }
+
+  /**
+   * Get recent daily logs (for context)
+   */
+  getRecentDailyLogs(days: number = 3): DailyLog[] {
+    return this.db.prepare(`
+      SELECT id, date, content, updated_at
+      FROM daily_logs
+      ORDER BY date DESC
+      LIMIT ?
+    `).all(days) as DailyLog[];
+  }
+
+  /**
+   * Get daily logs as formatted context string for the agent
+   */
+  getDailyLogsContext(days: number = 3): string {
+    const logs = this.getRecentDailyLogs(days);
+    if (logs.length === 0) {
+      return '';
+    }
+
+    const lines: string[] = ['## Recent Daily Logs'];
+    for (const log of logs.reverse()) {  // Show oldest first
+      const dateLabel = log.date === this.getTodayDate() ? 'Today' : log.date;
+      lines.push(`\n### ${dateLabel}`);
+      lines.push(log.content);
+    }
+
+    return lines.join('\n');
+  }
+
   // ============ MESSAGE METHODS ============
 
-  saveMessage(role: 'user' | 'assistant' | 'system', content: string): number {
+  saveMessage(role: 'user' | 'assistant' | 'system', content: string, sessionId: string = 'default'): number {
     const tokenCount = estimateTokens(content);
     const stmt = this.db.prepare(`
-      INSERT INTO messages (role, content, token_count)
-      VALUES (?, ?, ?)
+      INSERT INTO messages (role, content, token_count, session_id)
+      VALUES (?, ?, ?, ?)
     `);
-    const result = stmt.run(role, content, tokenCount);
+    const result = stmt.run(role, content, tokenCount, sessionId);
+
+    // Touch session to update activity timestamp
+    this.touchSession(sessionId);
+
     return result.lastInsertRowid as number;
   }
 
-  getRecentMessages(limit: number = 50): Message[] {
+  getRecentMessages(limit: number = 50, sessionId: string = 'default'): Message[] {
     const stmt = this.db.prepare(`
-      SELECT id, role, content, timestamp, token_count
+      SELECT id, role, content, timestamp, token_count, session_id
       FROM messages
+      WHERE session_id = ?
       ORDER BY id DESC
       LIMIT ?
     `);
-    const rows = stmt.all(limit) as Message[];
+    const rows = stmt.all(sessionId, limit) as Message[];
     return rows.reverse();
   }
 
-  getMessageCount(): number {
+  getMessageCount(sessionId?: string): number {
+    if (sessionId) {
+      const stmt = this.db.prepare('SELECT COUNT(*) as count FROM messages WHERE session_id = ?');
+      const row = stmt.get(sessionId) as { count: number };
+      return row.count;
+    }
     const stmt = this.db.prepare('SELECT COUNT(*) as count FROM messages');
     const row = stmt.get() as { count: number };
     return row.count;
   }
 
   async getConversationContext(
-    tokenLimit: number = DEFAULT_TOKEN_LIMIT
+    tokenLimit: number = DEFAULT_TOKEN_LIMIT,
+    sessionId: string = 'default'
   ): Promise<ConversationContext> {
     const reservedTokens = 10000;
     const availableTokens = tokenLimit - reservedTokens;
@@ -392,18 +659,19 @@ export class MemoryManager {
     const MAX_MESSAGES_TO_FETCH = 1000;
 
     const recentMessagesQuery = this.db.prepare(`
-      SELECT id, role, content, timestamp, token_count
+      SELECT id, role, content, timestamp, token_count, session_id
       FROM messages
+      WHERE session_id = ?
       ORDER BY id DESC
       LIMIT ?
-    `).all(MAX_MESSAGES_TO_FETCH) as Message[];
+    `).all(sessionId, MAX_MESSAGES_TO_FETCH) as Message[];
 
     if (recentMessagesQuery.length === 0) {
       return { messages: [], totalTokens: 0, summarizedCount: 0 };
     }
 
     // Get total count to know if there are older messages beyond our limit
-    const totalCount = this.getMessageCount();
+    const totalCount = this.getMessageCount(sessionId);
 
     const recentMessages: Message[] = [];
     let tokenCount = 0;
@@ -432,7 +700,7 @@ export class MemoryManager {
     }
 
     const oldestRecentId = recentMessages[0]?.id || 0;
-    const summary = await this.getOrCreateSummary(oldestRecentId);
+    const summary = await this.getOrCreateSummary(oldestRecentId, sessionId);
 
     const contextMessages: Array<{ role: string; content: string }> = [];
 
@@ -457,29 +725,29 @@ export class MemoryManager {
     };
   }
 
-  private async getOrCreateSummary(beforeMessageId: number): Promise<string | undefined> {
+  private async getOrCreateSummary(beforeMessageId: number, sessionId: string = 'default'): Promise<string | undefined> {
     if (beforeMessageId <= 1) {
       return undefined;
     }
 
     const existingSummary = this.db.prepare(`
       SELECT content FROM summaries
-      WHERE end_message_id = ?
+      WHERE end_message_id = ? AND session_id = ?
       ORDER BY id DESC
       LIMIT 1
-    `).get(beforeMessageId - 1) as { content: string } | undefined;
+    `).get(beforeMessageId - 1, sessionId) as { content: string } | undefined;
 
     if (existingSummary) {
-      console.log(`[Memory] Retrieved existing summary for messages up to ID ${beforeMessageId - 1}`);
+      console.log(`[Memory] Retrieved existing summary for session ${sessionId}, messages up to ID ${beforeMessageId - 1}`);
       return existingSummary.content;
     }
 
     const messagesToSummarize = this.db.prepare(`
       SELECT id, role, content, timestamp
       FROM messages
-      WHERE id < ?
+      WHERE id < ? AND session_id = ?
       ORDER BY id ASC
-    `).all(beforeMessageId) as Message[];
+    `).all(beforeMessageId, sessionId) as Message[];
 
     if (messagesToSummarize.length === 0) {
       return undefined;
@@ -487,10 +755,10 @@ export class MemoryManager {
 
     const partialSummary = this.db.prepare(`
       SELECT id, end_message_id, content FROM summaries
-      WHERE end_message_id < ?
+      WHERE end_message_id < ? AND session_id = ?
       ORDER BY end_message_id DESC
       LIMIT 1
-    `).get(beforeMessageId) as { id: number; end_message_id: number; content: string } | undefined;
+    `).get(beforeMessageId, sessionId) as { id: number; end_message_id: number; content: string } | undefined;
 
     let summary: string;
     let startId: number;
@@ -516,18 +784,18 @@ export class MemoryManager {
     }
 
     const endId = messagesToSummarize[messagesToSummarize.length - 1].id;
-    console.log(`[Memory] Created new summary for messages ${startId}-${endId} (${messagesToSummarize.length} messages, ${estimateTokens(summary)} tokens)`);
+    console.log(`[Memory] Created new summary for session ${sessionId}, messages ${startId}-${endId} (${messagesToSummarize.length} messages, ${estimateTokens(summary)} tokens)`);
     this.db.prepare(`
-      INSERT INTO summaries (start_message_id, end_message_id, content, token_count)
-      VALUES (?, ?, ?, ?)
-    `).run(startId, endId, summary, estimateTokens(summary));
+      INSERT INTO summaries (start_message_id, end_message_id, content, token_count, session_id)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(startId, endId, summary, estimateTokens(summary), sessionId);
 
-    // Clean up old summaries that are now superseded (keep only the 3 most recent)
+    // Clean up old summaries that are now superseded (keep only the 3 most recent per session)
     this.db.prepare(`
-      DELETE FROM summaries WHERE id NOT IN (
-        SELECT id FROM summaries ORDER BY end_message_id DESC LIMIT 3
+      DELETE FROM summaries WHERE session_id = ? AND id NOT IN (
+        SELECT id FROM summaries WHERE session_id = ? ORDER BY end_message_id DESC LIMIT 3
       )
-    `).run();
+    `).run(sessionId, sessionId);
 
     return summary;
   }
@@ -868,19 +1136,32 @@ export class MemoryManager {
 
   // ============ UTILITY METHODS ============
 
-  getStats(): {
+  getStats(sessionId?: string): {
     messageCount: number;
     factCount: number;
     cronJobCount: number;
     summaryCount: number;
     estimatedTokens: number;
     embeddedFactCount: number;
+    sessionCount?: number;
   } {
-    const messages = this.db.prepare('SELECT COUNT(*) as c, SUM(token_count) as t FROM messages').get() as { c: number; t: number };
+    let messages: { c: number; t: number };
+    let summaries: { c: number };
+
+    if (sessionId) {
+      // Session-specific stats
+      messages = this.db.prepare('SELECT COUNT(*) as c, SUM(token_count) as t FROM messages WHERE session_id = ?').get(sessionId) as { c: number; t: number };
+      summaries = this.db.prepare('SELECT COUNT(*) as c FROM summaries WHERE session_id = ?').get(sessionId) as { c: number };
+    } else {
+      // Global stats
+      messages = this.db.prepare('SELECT COUNT(*) as c, SUM(token_count) as t FROM messages').get() as { c: number; t: number };
+      summaries = this.db.prepare('SELECT COUNT(*) as c FROM summaries').get() as { c: number };
+    }
+
     const facts = this.db.prepare('SELECT COUNT(*) as c FROM facts').get() as { c: number };
     const cronJobs = this.db.prepare('SELECT COUNT(*) as c FROM cron_jobs').get() as { c: number };
-    const summaries = this.db.prepare('SELECT COUNT(*) as c FROM summaries').get() as { c: number };
     const embeddedFacts = this.db.prepare('SELECT COUNT(DISTINCT fact_id) as c FROM chunks WHERE embedding IS NOT NULL').get() as { c: number };
+    const sessionCount = this.db.prepare('SELECT COUNT(*) as c FROM sessions').get() as { c: number };
 
     return {
       messageCount: messages.c,
@@ -889,12 +1170,20 @@ export class MemoryManager {
       summaryCount: summaries.c,
       estimatedTokens: messages.t || 0,
       embeddedFactCount: embeddedFacts.c,
+      sessionCount: sessionCount.c,
     };
   }
 
-  clearConversation(): void {
-    this.db.exec('DELETE FROM messages');
-    this.db.exec('DELETE FROM summaries');
+  clearConversation(sessionId?: string): void {
+    if (sessionId) {
+      // Clear only the specified session
+      this.db.prepare('DELETE FROM messages WHERE session_id = ?').run(sessionId);
+      this.db.prepare('DELETE FROM summaries WHERE session_id = ?').run(sessionId);
+    } else {
+      // Clear all (legacy behavior)
+      this.db.exec('DELETE FROM messages');
+      this.db.exec('DELETE FROM summaries');
+    }
   }
 
   /**

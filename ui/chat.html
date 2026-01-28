@@ -70,6 +70,132 @@
       opacity: 0.5;
     }
 
+    /* Session Tabs */
+    .tabs-container {
+      display: flex;
+      align-items: center;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      gap: 4px;
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+
+    .tabs-container::-webkit-scrollbar {
+      height: 0;
+    }
+
+    .tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      border-bottom: none;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: grab;
+      border-radius: 8px 8px 0 0;
+      transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
+      white-space: nowrap;
+      max-width: 180px;
+      position: relative;
+      user-select: none;
+      margin-bottom: -1px;
+    }
+
+    .tab:hover {
+      color: var(--text-primary);
+      background: var(--bg-secondary);
+      border-color: var(--text-muted);
+    }
+
+    .tab.active {
+      color: var(--text-primary);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-bottom: 1px solid var(--bg-primary);
+    }
+
+    .tab.dragging {
+      opacity: 0.6;
+      cursor: grabbing;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .tab.dragging .tab-close {
+      color: rgba(255,255,255,0.7);
+    }
+
+    .tab-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 120px;
+    }
+
+    .tab-name-input {
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      color: var(--text-primary);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 2px 6px;
+      width: 100px;
+      outline: none;
+    }
+
+    .tab-close {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 4px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      line-height: 1;
+      font-size: 14px;
+      transition: all 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .tab-close:hover {
+      background: var(--error);
+      color: white;
+    }
+
+    .new-tab-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      background: transparent;
+      border: 1px dashed var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 18px;
+      transition: all 0.15s ease;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .new-tab-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
+      background: rgba(168, 85, 247, 0.1);
+    }
+
     header.loading::after {
       background: linear-gradient(
         90deg,
@@ -1076,6 +1202,11 @@
     </div>
   </header>
 
+  <div class="tabs-container" id="tabs-container">
+    <!-- Tabs will be populated by JavaScript -->
+    <button class="new-tab-btn" onclick="createNewSession()" title="New chat">+</button>
+  </div>
+
   <div id="messages"></div>
 
   <div id="input-area">
@@ -1124,6 +1255,11 @@
     let currentSuggestion = null; // Stores the suggested prompt from the agent
     const ghostSuggestion = document.getElementById('ghost-suggestion');
 
+    // Session state
+    let sessions = [];
+    let currentSessionId = 'default';
+    const tabsContainer = document.getElementById('tabs-container');
+
     // Allowed file types
     const ALLOWED_EXTENSIONS = new Set([
       // Text/Code
@@ -1140,8 +1276,10 @@
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
     // Initialize
-    window.addEventListener('DOMContentLoaded', () => {
-      loadHistory();
+    window.addEventListener('DOMContentLoaded', async () => {
+      // Load sessions first, then load history for active session
+      await loadSessions();
+      await loadHistory();
       updateStats();
       input.focus();
 
@@ -1159,6 +1297,225 @@
       });
       console.log('[Chat] Telegram message listener set up');
     });
+
+    // ============ SESSION MANAGEMENT ============
+
+    async function loadSessions() {
+      try {
+        sessions = await window.pocketAgent.getSessions();
+        renderTabs();
+        // Set current session to the first one (most recently active) or default
+        if (sessions.length > 0) {
+          currentSessionId = sessions[0].id;
+        }
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+      }
+    }
+
+    let draggedTab = null;
+    let draggedSessionId = null;
+
+    function renderTabs() {
+      // Remove existing tabs (keep the new tab button)
+      const existingTabs = tabsContainer.querySelectorAll('.tab');
+      existingTabs.forEach(tab => tab.remove());
+
+      // Add tabs before the new tab button
+      const newTabBtn = tabsContainer.querySelector('.new-tab-btn');
+
+      sessions.forEach((session, index) => {
+        const tab = document.createElement('div');
+        tab.className = 'tab' + (session.id === currentSessionId ? ' active' : '');
+        tab.dataset.sessionId = session.id;
+        tab.dataset.index = index;
+        tab.draggable = true;
+
+        tab.onclick = (e) => {
+          if (!e.target.closest('.tab-close') && !e.target.closest('.tab-name-input')) {
+            switchSession(session.id);
+          }
+        };
+        tab.ondblclick = () => startRenameSession(session.id);
+
+        // Drag events
+        tab.ondragstart = (e) => {
+          draggedTab = tab;
+          draggedSessionId = session.id;
+          setTimeout(() => tab.classList.add('dragging'), 0);
+          e.dataTransfer.effectAllowed = 'move';
+        };
+
+        tab.ondragend = () => {
+          if (draggedTab) {
+            draggedTab.classList.remove('dragging');
+          }
+          draggedTab = null;
+          draggedSessionId = null;
+        };
+
+        tab.ondragover = (e) => {
+          e.preventDefault();
+          if (!draggedTab || draggedSessionId === session.id) return;
+
+          // Get the tab being hovered over
+          const targetTab = tab;
+          const rect = targetTab.getBoundingClientRect();
+          const midpoint = rect.left + rect.width / 2;
+
+          // Determine if we should insert before or after
+          if (e.clientX < midpoint) {
+            // Insert before this tab
+            if (targetTab.previousElementSibling !== draggedTab) {
+              tabsContainer.insertBefore(draggedTab, targetTab);
+              updateSessionsOrder();
+            }
+          } else {
+            // Insert after this tab
+            if (targetTab.nextElementSibling !== draggedTab) {
+              tabsContainer.insertBefore(draggedTab, targetTab.nextElementSibling);
+              updateSessionsOrder();
+            }
+          }
+        };
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'tab-name';
+        nameSpan.textContent = session.name;
+        tab.appendChild(nameSpan);
+
+        // Don't show close button for default session if it's the only one
+        if (session.id !== 'default' || sessions.length > 1) {
+          const closeBtn = document.createElement('button');
+          closeBtn.className = 'tab-close';
+          closeBtn.innerHTML = '×';
+          closeBtn.onclick = (e) => {
+            e.stopPropagation();
+            confirmDeleteSession(session.id, session.name);
+          };
+          tab.appendChild(closeBtn);
+        }
+
+        tabsContainer.insertBefore(tab, newTabBtn);
+      });
+    }
+
+    function updateSessionsOrder() {
+      // Update sessions array to match current DOM order
+      const tabs = tabsContainer.querySelectorAll('.tab');
+      const newOrder = [];
+      tabs.forEach(tab => {
+        const sessionId = tab.dataset.sessionId;
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) newOrder.push(session);
+      });
+      sessions = newOrder;
+    }
+
+    function confirmDeleteSession(sessionId, sessionName) {
+      if (sessions.length <= 1) return;
+
+      if (confirm(`Delete "${sessionName}"? This will remove all messages in this chat.`)) {
+        deleteSession(sessionId);
+      }
+    }
+
+    async function switchSession(sessionId) {
+      if (sessionId === currentSessionId || isLoading) return;
+
+      currentSessionId = sessionId;
+      renderTabs();
+      messagesDiv.innerHTML = '';
+      await loadHistory();
+      updateStats();
+      input.focus();
+    }
+
+    async function createNewSession() {
+      try {
+        const session = await window.pocketAgent.createSession('New Chat');
+        sessions.push(session); // Add to end (right side)
+        currentSessionId = session.id;
+        renderTabs();
+        messagesDiv.innerHTML = '';
+        showEmptyState();
+        updateStats();
+        input.focus();
+        // Start rename immediately
+        setTimeout(() => startRenameSession(session.id), 100);
+      } catch (err) {
+        console.error('Failed to create session:', err);
+      }
+    }
+
+    function startRenameSession(sessionId) {
+      const tab = tabsContainer.querySelector(`[data-session-id="${sessionId}"]`);
+      if (!tab) return;
+
+      const nameSpan = tab.querySelector('.tab-name');
+      const currentName = nameSpan.textContent;
+
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'tab-name-input';
+      input.value = currentName;
+
+      input.onblur = () => finishRename(sessionId, input.value);
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          input.blur();
+        } else if (e.key === 'Escape') {
+          input.value = currentName;
+          input.blur();
+        }
+      };
+
+      nameSpan.replaceWith(input);
+      input.focus();
+      input.select();
+    }
+
+    async function finishRename(sessionId, newName) {
+      const trimmedName = newName.trim() || 'Untitled';
+
+      try {
+        await window.pocketAgent.renameSession(sessionId, trimmedName);
+        // Update local state
+        const session = sessions.find(s => s.id === sessionId);
+        if (session) {
+          session.name = trimmedName;
+        }
+        renderTabs();
+      } catch (err) {
+        console.error('Failed to rename session:', err);
+        renderTabs(); // Revert UI
+      }
+    }
+
+    async function deleteSession(sessionId) {
+      if (sessions.length <= 1) {
+        // Can't delete the last session
+        return;
+      }
+
+      try {
+        await window.pocketAgent.deleteSession(sessionId);
+        sessions = sessions.filter(s => s.id !== sessionId);
+
+        // If we deleted the current session, switch to another
+        if (sessionId === currentSessionId) {
+          currentSessionId = sessions[0]?.id || 'default';
+          messagesDiv.innerHTML = '';
+          await loadHistory();
+        }
+
+        renderTabs();
+        updateStats();
+      } catch (err) {
+        console.error('Failed to delete session:', err);
+      }
+    }
 
     function handleSchedulerMessage(data) {
       // Clear empty state if present
@@ -1244,7 +1601,7 @@
 
     async function loadHistory() {
       try {
-        const history = await window.pocketAgent.getHistory(100);
+        const history = await window.pocketAgent.getHistory(100, currentSessionId);
         messagesDiv.innerHTML = '';
 
         if (history.length === 0) {
@@ -1293,12 +1650,12 @@
 
     async function updateStats() {
       try {
-        const stats = await window.pocketAgent.getStats();
+        const stats = await window.pocketAgent.getStats(currentSessionId);
         if (stats) {
           const tokens = stats.estimatedTokens >= 1000
             ? `${(stats.estimatedTokens / 1000).toFixed(1)}k`
             : stats.estimatedTokens;
-          statsDiv.textContent = `${stats.messageCount} messages · ${stats.factCount} facts · ${tokens} tokens`;
+          statsDiv.textContent = `${stats.messageCount} msgs · ${stats.factCount} facts · ${tokens} tokens`;
         }
       } catch (err) {
         console.error('Failed to get stats:', err);
@@ -1394,7 +1751,7 @@
       });
 
       try {
-        const result = await window.pocketAgent.send(fullMessage);
+        const result = await window.pocketAgent.send(fullMessage, currentSessionId);
 
         // Clean up status listener
         if (statusCleanup) {
@@ -1488,7 +1845,7 @@
       if (!confirm('Start fresh? Don\'t worry - I\'ll keep everything I know about you!')) return;
 
       try {
-        await window.pocketAgent.clearConversation();
+        await window.pocketAgent.clearConversation(currentSessionId);
         messagesDiv.innerHTML = '';
         showEmptyState();
         updateStats();

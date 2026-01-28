@@ -812,7 +812,7 @@ function showNotification(title: string, body: string): void {
 
 function setupIPC(): void {
   // Chat messages with status streaming
-  ipcMain.handle('agent:send', async (event, message: string) => {
+  ipcMain.handle('agent:send', async (event, message: string, sessionId?: string) => {
     // Set up status listener to forward to renderer
     const statusHandler = (status: { type: string; toolName?: string; toolInput?: string; message?: string }) => {
       // Send status update to the chat window that initiated the request
@@ -825,7 +825,7 @@ function setupIPC(): void {
     AgentManager.on('status', statusHandler);
 
     try {
-      const result = await AgentManager.processMessage(message, 'desktop');
+      const result = await AgentManager.processMessage(message, 'desktop', sessionId || 'default');
       updateTrayMenu();
 
       // Sync to Telegram (Desktop -> Telegram)
@@ -851,18 +851,37 @@ function setupIPC(): void {
     }
   });
 
-  ipcMain.handle('agent:history', async (_, limit: number = 50) => {
-    return AgentManager.getRecentMessages(limit);
+  ipcMain.handle('agent:history', async (_, limit: number = 50, sessionId?: string) => {
+    return AgentManager.getRecentMessages(limit, sessionId || 'default');
   });
 
-  ipcMain.handle('agent:stats', async () => {
-    return AgentManager.getStats();
+  ipcMain.handle('agent:stats', async (_, sessionId?: string) => {
+    return AgentManager.getStats(sessionId);
   });
 
-  ipcMain.handle('agent:clear', async () => {
-    AgentManager.clearConversation();
+  ipcMain.handle('agent:clear', async (_, sessionId?: string) => {
+    AgentManager.clearConversation(sessionId);
     updateTrayMenu();
     return { success: true };
+  });
+
+  // Sessions
+  ipcMain.handle('sessions:list', async () => {
+    return memory?.getSessions() || [];
+  });
+
+  ipcMain.handle('sessions:create', async (_, name: string) => {
+    return memory?.createSession(name);
+  });
+
+  ipcMain.handle('sessions:rename', async (_, id: string, name: string) => {
+    const success = memory?.renameSession(id, name) ?? false;
+    return { success };
+  });
+
+  ipcMain.handle('sessions:delete', async (_, id: string) => {
+    const success = memory?.deleteSession(id) ?? false;
+    return { success };
   });
 
   ipcMain.handle('agent:stop', async () => {

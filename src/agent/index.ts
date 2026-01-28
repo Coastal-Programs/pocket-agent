@@ -148,7 +148,8 @@ class AgentManagerClass extends EventEmitter {
 
   async processMessage(
     userMessage: string,
-    channel: string = 'default'
+    channel: string = 'default',
+    sessionId: string = 'default'
   ): Promise<ProcessResult> {
     if (!this.memory) {
       throw new Error('AgentManager not initialized - call initialize() first');
@@ -165,14 +166,14 @@ class AgentManagerClass extends EventEmitter {
 
     try {
       const { maxContextTokens, compactionThreshold } = getTokenLimits();
-      const statsBefore = this.memory.getStats();
+      const statsBefore = this.memory.getStats(sessionId);
       if (statsBefore.estimatedTokens > compactionThreshold) {
         console.log('[AgentManager] Token limit approaching, running compaction...');
-        await this.runCompaction();
+        await this.runCompaction(sessionId);
         wasCompacted = true;
       }
 
-      const context = await this.memory.getConversationContext(maxContextTokens);
+      const context = await this.memory.getConversationContext(maxContextTokens, sessionId);
       const factsContext = this.memory.getFactsForContext();
 
       console.log(`[AgentManager] Loaded ${context.messages.length} messages (${context.totalTokens} tokens)`);
@@ -224,9 +225,9 @@ class AgentManagerClass extends EventEmitter {
       if (isScheduledJob && isHeartbeat) {
         console.log('[AgentManager] Skipping HEARTBEAT_OK from scheduled job - not saving to memory');
       } else {
-        this.memory.saveMessage('user', userMessage);
-        this.memory.saveMessage('assistant', response);
-        console.log('[AgentManager] Saved messages to SQLite');
+        this.memory.saveMessage('user', userMessage, sessionId);
+        this.memory.saveMessage('assistant', response, sessionId);
+        console.log('[AgentManager] Saved messages to SQLite (session: ' + sessionId + ')');
       }
 
       this.extractAndStoreFacts(userMessage);
@@ -250,7 +251,7 @@ class AgentManagerClass extends EventEmitter {
 
       // Only save user message if not aborted
       if (!this.currentAbortController?.signal.aborted) {
-        this.memory.saveMessage('user', userMessage);
+        this.memory.saveMessage('user', userMessage, sessionId);
       }
 
       throw error;
@@ -301,6 +302,12 @@ class AgentManagerClass extends EventEmitter {
       appendParts.push(factsContext);
     }
 
+    // Add daily logs context (recent activity journal)
+    const dailyLogsContext = this.memory?.getDailyLogsContext(3);
+    if (dailyLogsContext) {
+      appendParts.push(dailyLogsContext);
+    }
+
     // Add capabilities information
     const capabilities = this.buildCapabilitiesPrompt();
     if (capabilities) {
@@ -332,6 +339,7 @@ class AgentManagerClass extends EventEmitter {
         'mcp__pocket-agent__forget',
         'mcp__pocket-agent__list_facts',
         'mcp__pocket-agent__memory_search',
+        'mcp__pocket-agent__daily_log',
         // Custom MCP tools - scheduler
         'mcp__pocket-agent__schedule_task',
         'mcp__pocket-agent__list_scheduled_tasks',
@@ -798,24 +806,24 @@ pty_exec(command="htop", timeout=30000)
     return '';
   }
 
-  private async runCompaction(): Promise<void> {
+  private async runCompaction(sessionId: string = 'default'): Promise<void> {
     if (!this.memory) return;
 
-    console.log('[AgentManager] Running compaction...');
+    console.log('[AgentManager] Running compaction for session:', sessionId);
 
     // Before compaction, extract and save important facts from recent messages
-    await this.extractFactsBeforeCompaction();
+    await this.extractFactsBeforeCompaction(sessionId);
 
     const { maxContextTokens } = getTokenLimits();
-    await this.memory.getConversationContext(maxContextTokens);
-    const stats = this.memory.getStats();
+    await this.memory.getConversationContext(maxContextTokens, sessionId);
+    const stats = this.memory.getStats(sessionId);
     console.log(`[AgentManager] Compaction complete. Now at ${stats.estimatedTokens} tokens`);
   }
 
   /**
    * Extract important facts from recent conversation before compaction
    */
-  private async extractFactsBeforeCompaction(): Promise<void> {
+  private async extractFactsBeforeCompaction(sessionId: string = 'default'): Promise<void> {
     if (!this.memory) return;
 
     try {
@@ -823,7 +831,7 @@ pty_exec(command="htop", timeout=30000)
       if (!query) return;
 
       // Get recent messages that haven't been processed for facts
-      const recentMessages = this.memory.getRecentMessages(30);
+      const recentMessages = this.memory.getRecentMessages(30, sessionId);
       if (recentMessages.length < 5) return;
 
       const conversationText = recentMessages
@@ -970,13 +978,13 @@ ${conversationText}`;
 
   // ============ Public API ============
 
-  getStats(): ReturnType<MemoryManager['getStats']> | null {
-    return this.memory?.getStats() || null;
+  getStats(sessionId?: string): ReturnType<MemoryManager['getStats']> | null {
+    return this.memory?.getStats(sessionId) || null;
   }
 
-  clearConversation(): void {
-    this.memory?.clearConversation();
-    console.log('[AgentManager] Conversation cleared');
+  clearConversation(sessionId?: string): void {
+    this.memory?.clearConversation(sessionId);
+    console.log('[AgentManager] Conversation cleared' + (sessionId ? ` (session: ${sessionId})` : ''));
   }
 
   getMemory(): MemoryManager | null {
@@ -995,8 +1003,8 @@ ${conversationText}`;
     return this.memory?.getAllFacts() || [];
   }
 
-  getRecentMessages(limit: number = 10): Message[] {
-    return this.memory?.getRecentMessages(limit) || [];
+  getRecentMessages(limit: number = 10, sessionId: string = 'default'): Message[] {
+    return this.memory?.getRecentMessages(limit, sessionId) || [];
   }
 
   getToolsConfig(): ToolsConfig | null {

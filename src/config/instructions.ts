@@ -1,15 +1,17 @@
 /**
  * Agent Instructions Configuration
  *
- * Loads agent instructions from ~/.my-assistant/CLAUDE.md
- * This is the internal CLAUDE.md that Pocket Agent uses (separate from the project's CLAUDE.md)
+ * Loads agent instructions from ~/Documents/Pocket-agent/CLAUDE.md
+ * This is the workspace CLAUDE.md that the SDK reads AND the user can customize.
+ * Single source of truth for agent behavior instructions.
  */
 
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const INSTRUCTIONS_DIR = path.join(os.homedir(), '.my-assistant');
+// Workspace CLAUDE.md - SDK reads this, user edits this via UI
+const INSTRUCTIONS_DIR = path.join(os.homedir(), 'Documents', 'Pocket-agent');
 const INSTRUCTIONS_FILE = path.join(INSTRUCTIONS_DIR, 'CLAUDE.md');
 
 const DEFAULT_INSTRUCTIONS = `# Pocket Agent Instructions
@@ -74,7 +76,9 @@ All tools are pre-approved. Use them directly.
 `;
 
 /**
- * Load instructions from file, create default if missing
+ * Load instructions from CLAUDE.md
+ * This file is created by ensureAgentWorkspace() and editable via the UI.
+ * No migration needed - workspace CLAUDE.md is the single source of truth.
  */
 export function loadInstructions(): string {
   try {
@@ -88,6 +92,8 @@ export function loadInstructions(): string {
       console.log('[Instructions] Loaded from:', INSTRUCTIONS_FILE);
       return content;
     } else {
+      // This shouldn't happen - ensureAgentWorkspace() creates CLAUDE.md
+      // But create a default just in case
       fs.writeFileSync(INSTRUCTIONS_FILE, DEFAULT_INSTRUCTIONS);
       console.log('[Instructions] Created default at:', INSTRUCTIONS_FILE);
       return DEFAULT_INSTRUCTIONS;

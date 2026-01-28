@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 // Expose API to renderer process
 contextBridge.exposeInMainWorld('pocketAgent', {
   // Chat
-  send: (message: string) => ipcRenderer.invoke('agent:send', message),
+  send: (message: string, sessionId?: string) => ipcRenderer.invoke('agent:send', message, sessionId),
   stop: () => ipcRenderer.invoke('agent:stop'),
   onStatus: (callback: (status: { type: string; toolName?: string; toolInput?: string; message?: string }) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, status: { type: string; toolName?: string; toolInput?: string; message?: string }) => callback(status);
@@ -22,9 +22,15 @@ contextBridge.exposeInMainWorld('pocketAgent', {
     ipcRenderer.on('telegram:message', listener);
     return () => ipcRenderer.removeListener('telegram:message', listener);
   },
-  getHistory: (limit?: number) => ipcRenderer.invoke('agent:history', limit),
-  getStats: () => ipcRenderer.invoke('agent:stats'),
-  clearConversation: () => ipcRenderer.invoke('agent:clear'),
+  getHistory: (limit?: number, sessionId?: string) => ipcRenderer.invoke('agent:history', limit, sessionId),
+  getStats: (sessionId?: string) => ipcRenderer.invoke('agent:stats', sessionId),
+  clearConversation: (sessionId?: string) => ipcRenderer.invoke('agent:clear', sessionId),
+
+  // Sessions
+  getSessions: () => ipcRenderer.invoke('sessions:list'),
+  createSession: (name: string) => ipcRenderer.invoke('sessions:create', name),
+  renameSession: (id: string, name: string) => ipcRenderer.invoke('sessions:rename', id, name),
+  deleteSession: (id: string) => ipcRenderer.invoke('sessions:delete', id),
 
   // Facts
   listFacts: () => ipcRenderer.invoke('facts:list'),
@@ -89,19 +95,32 @@ contextBridge.exposeInMainWorld('pocketAgent', {
     ipcRenderer.invoke('skills:runSetupCommand', params),
 });
 
+// Session type
+interface Session {
+  id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // Type declarations for renderer
 declare global {
   interface Window {
     pocketAgent: {
-      send: (message: string) => Promise<{ success: boolean; response?: string; error?: string; tokensUsed?: number }>;
+      send: (message: string, sessionId?: string) => Promise<{ success: boolean; response?: string; error?: string; tokensUsed?: number; suggestedPrompt?: string }>;
       stop: () => Promise<{ success: boolean }>;
       onStatus: (callback: (status: { type: string; toolName?: string; toolInput?: string; message?: string }) => void) => () => void;
       saveAttachment: (name: string, dataUrl: string) => Promise<string>;
       onSchedulerMessage: (callback: (data: { jobName: string; prompt: string; response: string }) => void) => () => void;
       onTelegramMessage: (callback: (data: { userMessage: string; response: string; chatId: number }) => void) => () => void;
-      getHistory: (limit?: number) => Promise<Array<{ role: string; content: string; timestamp: string }>>;
-      getStats: () => Promise<{ messageCount: number; factCount: number; estimatedTokens: number } | null>;
-      clearConversation: () => Promise<{ success: boolean }>;
+      getHistory: (limit?: number, sessionId?: string) => Promise<Array<{ role: string; content: string; timestamp: string }>>;
+      getStats: (sessionId?: string) => Promise<{ messageCount: number; factCount: number; estimatedTokens: number; sessionCount?: number } | null>;
+      clearConversation: (sessionId?: string) => Promise<{ success: boolean }>;
+      // Sessions
+      getSessions: () => Promise<Session[]>;
+      createSession: (name: string) => Promise<Session>;
+      renameSession: (id: string, name: string) => Promise<{ success: boolean }>;
+      deleteSession: (id: string) => Promise<{ success: boolean }>;
       listFacts: () => Promise<Array<{ id: number; category: string; subject: string; content: string }>>;
       searchFacts: (query: string) => Promise<Array<{ category: string; subject: string; content: string }>>;
       getFactCategories: () => Promise<string[]>;
