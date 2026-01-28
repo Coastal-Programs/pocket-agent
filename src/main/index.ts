@@ -975,6 +975,7 @@ function showNotification(title: string, body: string): void {
 function setupIPC(): void {
   // Chat messages with status streaming
   ipcMain.handle('agent:send', async (event, message: string, sessionId?: string) => {
+    console.log(`[IPC] agent:send received sessionId: ${sessionId}`);
     // Set up status listener to forward to renderer
     const statusHandler = (status: { type: string; toolName?: string; toolInput?: string; message?: string }) => {
       // Send status update to the chat window that initiated the request
@@ -1636,12 +1637,12 @@ async function initializeAgent(): Promise<void> {
       showNotification(title, body);
     });
 
-    // Set chat handler for scheduler (sends messages to chat window)
-    scheduler.setChatHandler((jobName: string, prompt: string, response: string) => {
-      console.log(`[Scheduler] Sending chat message for job: ${jobName}`);
-      // Send to chat window if open
+    // Set chat handler for scheduler (sends messages to chat window with session context)
+    scheduler.setChatHandler((jobName: string, prompt: string, response: string, sessionId: string) => {
+      console.log(`[Scheduler] Sending chat message for job: ${jobName} (session: ${sessionId})`);
+      // Send to chat window if open, with session context
       if (chatWindow && !chatWindow.isDestroyed()) {
-        chatWindow.webContents.send('scheduler:message', { jobName, prompt, response });
+        chatWindow.webContents.send('scheduler:message', { jobName, prompt, response, sessionId });
       }
       // Also open chat window if not open
       if (!chatWindow || chatWindow.isDestroyed()) {
@@ -1649,7 +1650,7 @@ async function initializeAgent(): Promise<void> {
         // Wait a bit for window to load, then send message
         setTimeout(() => {
           if (chatWindow && !chatWindow.isDestroyed()) {
-            chatWindow.webContents.send('scheduler:message', { jobName, prompt, response });
+            chatWindow.webContents.send('scheduler:message', { jobName, prompt, response, sessionId });
           }
         }, 1000);
       }

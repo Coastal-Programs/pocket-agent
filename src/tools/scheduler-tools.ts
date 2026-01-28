@@ -12,6 +12,7 @@ import { getScheduler } from '../scheduler';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getCurrentSessionId } from './session-context';
 
 function getDbPath(): string {
   const homeDir = process.env.HOME || process.env.USERPROFILE || '';
@@ -310,6 +311,11 @@ export async function handleScheduleTaskTool(input: unknown): Promise<string> {
     try {
       db.exec(`ALTER TABLE cron_jobs ADD COLUMN next_run_at TEXT`);
     } catch { /* column exists */ }
+    try {
+      db.exec(`ALTER TABLE cron_jobs ADD COLUMN session_id TEXT`);
+    } catch { /* column exists */ }
+
+    const sessionId = getCurrentSessionId();
 
     // Auto-enable delete-after for one-time "at" jobs
     const deleteAfterRun = parsed.type === 'at' ? 1 : 0;
@@ -353,22 +359,22 @@ export async function handleScheduleTaskTool(input: unknown): Promise<string> {
         UPDATE cron_jobs SET
           schedule_type = ?, schedule = ?, run_at = ?, interval_ms = ?,
           prompt = ?, channel = ?, enabled = 1,
-          delete_after_run = ?, next_run_at = ?,
+          delete_after_run = ?, next_run_at = ?, session_id = ?,
           updated_at = datetime('now')
         WHERE name = ?
       `).run(
         parsed.type, parsed.schedule || null, parsed.runAt || null, parsed.intervalMs || null,
-        prompt, targetChannel, deleteAfterRun, nextRunAt, name
+        prompt, targetChannel, deleteAfterRun, nextRunAt, sessionId, name
       );
     } else {
       db.prepare(`
         INSERT INTO cron_jobs (
           name, schedule_type, schedule, run_at, interval_ms,
-          prompt, channel, enabled, delete_after_run, next_run_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+          prompt, channel, enabled, delete_after_run, next_run_at, session_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
       `).run(
         name, parsed.type, parsed.schedule || null, parsed.runAt || null, parsed.intervalMs || null,
-        prompt, targetChannel, deleteAfterRun, nextRunAt
+        prompt, targetChannel, deleteAfterRun, nextRunAt, sessionId
       );
     }
 
@@ -394,6 +400,7 @@ export async function handleScheduleTaskTool(input: unknown): Promise<string> {
       next_run: formatDateTime(nextRunAt),
       one_time: deleteAfterRun === 1,
       channel: targetChannel,
+      session_id: sessionId,
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';

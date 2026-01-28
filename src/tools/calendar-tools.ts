@@ -7,6 +7,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getCurrentSessionId } from './session-context';
 
 // Shared database connection (singleton pattern for connection pooling)
 let sharedDb: Database.Database | null = null;
@@ -144,10 +145,12 @@ function ensureTable(db: Database.Database): void {
       reminder_minutes INTEGER DEFAULT 15,
       reminded INTEGER DEFAULT 0,
       channel TEXT DEFAULT 'desktop',
+      session_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_calendar_start ON calendar_events(start_time);
+    CREATE INDEX IF NOT EXISTS idx_calendar_session ON calendar_events(session_id);
   `);
 }
 
@@ -218,10 +221,12 @@ export async function handleCalendarAddTool(input: unknown): Promise<string> {
     return JSON.stringify({ error: 'Database not found. Start Pocket Agent first.' });
   }
 
+  const sessionId = getCurrentSessionId();
+
   const result = db.prepare(`
-    INSERT INTO calendar_events (title, description, start_time, end_time, location, reminder_minutes, channel)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(params.title, params.description || null, startTime, endTime, params.location || null, reminderMinutes, channel);
+    INSERT INTO calendar_events (title, description, start_time, end_time, location, reminder_minutes, channel, session_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(params.title, params.description || null, startTime, endTime, params.location || null, reminderMinutes, channel, sessionId);
 
   return JSON.stringify({
     success: true,
@@ -230,6 +235,7 @@ export async function handleCalendarAddTool(input: unknown): Promise<string> {
     start_time: formatDateTime(startTime),
     reminder_minutes: reminderMinutes,
     channel,
+    session_id: sessionId,
   });
 }
 
@@ -264,8 +270,10 @@ export async function handleCalendarListTool(input: unknown): Promise<string> {
     return JSON.stringify({ error: 'Database not found' });
   }
 
-  let query = 'SELECT * FROM calendar_events WHERE 1=1';
-  const queryParams: string[] = [];
+  const sessionId = getCurrentSessionId();
+
+  let query = 'SELECT * FROM calendar_events WHERE session_id = ?';
+  const queryParams: (string | null)[] = [sessionId];
 
   if (params.date) {
     const filterDate =
@@ -335,14 +343,15 @@ export async function handleCalendarUpcomingTool(input: unknown): Promise<string
     return JSON.stringify({ error: 'Database not found' });
   }
 
+  const sessionId = getCurrentSessionId();
   const now = new Date();
   const later = new Date(now.getTime() + hours * 3600000);
 
   const events = db.prepare(`
     SELECT * FROM calendar_events
-    WHERE start_time >= ? AND start_time <= ?
+    WHERE session_id = ? AND start_time >= ? AND start_time <= ?
     ORDER BY start_time ASC
-  `).all(now.toISOString(), later.toISOString()) as Array<{
+  `).all(sessionId, now.toISOString(), later.toISOString()) as Array<{
     id: number;
     title: string;
     start_time: string;

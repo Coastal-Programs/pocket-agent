@@ -1303,7 +1303,7 @@
 
       // Listen for scheduler messages
       window.pocketAgent.onSchedulerMessage((data) => {
-        console.log('[Chat] Received scheduler message:', data.jobName);
+        console.log('[Chat] Received scheduler message:', data.jobName, 'sessionId:', data.sessionId, 'currentSession:', currentSessionId);
         handleSchedulerMessage(data);
       });
 
@@ -1578,6 +1578,14 @@
     }
 
     function handleSchedulerMessage(data) {
+      console.log(`[Chat] handleSchedulerMessage called - data.sessionId: ${data.sessionId}, currentSessionId: ${currentSessionId}`);
+      // Only show message if it's for the current session
+      if (data.sessionId && data.sessionId !== currentSessionId) {
+        console.log(`[Chat] SKIPPING - session mismatch`);
+        return;
+      }
+      console.log(`[Chat] DISPLAYING - session matches or no sessionId`);
+
       // Clear empty state if present
       const emptyState = messagesDiv.querySelector('.empty-state');
       if (emptyState) emptyState.remove();

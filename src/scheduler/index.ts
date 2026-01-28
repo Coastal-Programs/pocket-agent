@@ -19,6 +19,7 @@ interface CalendarEvent {
   location: string | null;
   reminder_minutes: number;
   channel: string;
+  session_id: string | null;
 }
 
 interface Task {
@@ -29,6 +30,7 @@ interface Task {
   priority: string;
   reminder_minutes: number;
   channel: string;
+  session_id: string | null;
 }
 
 export interface ScheduledJob {
@@ -45,6 +47,7 @@ export interface ScheduledJob {
   deleteAfterRun?: boolean;
   contextMessages?: number;
   nextRunAt?: string | null;
+  sessionId?: string | null;
 }
 
 export interface JobResult {
@@ -146,7 +149,7 @@ export class CronScheduler {
 
       // Check calendar events
       const events = db.prepare(`
-        SELECT id, title, description, start_time, location, reminder_minutes, channel
+        SELECT id, title, description, start_time, location, reminder_minutes, channel, session_id
         FROM calendar_events
         WHERE reminded = 0
           AND datetime(start_time, '-' || reminder_minutes || ' minutes') <= datetime(?)
@@ -167,7 +170,8 @@ export class CronScheduler {
           message += ` at ${event.location}`;
         }
 
-        await this.sendReminder('calendar', event.title, message, event.channel);
+        const sessionId = event.session_id || 'default';
+        await this.sendReminder('calendar', event.title, message, event.channel, sessionId);
 
         // Mark as reminded
         db.prepare('UPDATE calendar_events SET reminded = 1 WHERE id = ?').run(event.id);
@@ -175,7 +179,7 @@ export class CronScheduler {
 
       // Check tasks with due dates
       const tasks = db.prepare(`
-        SELECT id, title, description, due_date, priority, reminder_minutes, channel
+        SELECT id, title, description, due_date, priority, reminder_minutes, channel, session_id
         FROM tasks
         WHERE status != 'completed'
           AND reminded = 0
@@ -198,7 +202,8 @@ export class CronScheduler {
           message += ' (High Priority)';
         }
 
-        await this.sendReminder('task', task.title, message, task.channel);
+        const sessionId = task.session_id || 'default';
+        await this.sendReminder('task', task.title, message, task.channel, sessionId);
 
         // Mark as reminded
         db.prepare('UPDATE tasks SET reminded = 1 WHERE id = ?').run(task.id);
@@ -229,10 +234,11 @@ export class CronScheduler {
       channel: string;
       delete_after_run: number;
       context_messages: number;
+      session_id: string | null;
     }
 
     const dueJobs = db.prepare(`
-      SELECT id, name, schedule_type, schedule, run_at, interval_ms, prompt, channel, delete_after_run, context_messages
+      SELECT id, name, schedule_type, schedule, run_at, interval_ms, prompt, channel, delete_after_run, context_messages, session_id
       FROM cron_jobs
       WHERE enabled = 1 AND next_run_at IS NOT NULL AND datetime(next_run_at) <= datetime(?)
     `).all(now.toISOString()) as DueJob[];
@@ -243,10 +249,11 @@ export class CronScheduler {
       try {
         console.log(`[Scheduler] Executing job: ${job.name}`);
 
-        // Get context messages if requested
+        // Get context messages if requested (from the job's session)
+        const sessionId = job.session_id || 'default';
         let contextText = '';
         if (job.context_messages > 0 && this.memory) {
-          const history = this.memory.getRecentMessages(job.context_messages);
+          const history = this.memory.getRecentMessages(job.context_messages, sessionId);
           if (history.length > 0) {
             const lines = history.map(m => {
               const role = m.role === 'user' ? 'User' : 'Assistant';
@@ -259,14 +266,15 @@ export class CronScheduler {
 
         const fullPrompt = job.prompt + contextText + '\n\nIf nothing needs attention, reply with only HEARTBEAT_OK.';
 
-        // Execute through agent
+        // Execute through agent (using the job's session)
         if (!AgentManager.isInitialized()) {
           throw new Error('AgentManager not initialized');
         }
 
         const result = await AgentManager.processMessage(
           `[Scheduled: ${job.name}] ${fullPrompt}`,
-          `cron:${job.name}`
+          `cron:${job.name}`,
+          sessionId
         );
 
         const duration = Date.now() - startTime;
@@ -292,8 +300,8 @@ export class CronScheduler {
           `).run(now.toISOString(), duration, nextRunAt, job.id);
         }
 
-        // Route response
-        await this.routeJobResponse(job.name, job.prompt, result.response, job.channel);
+        // Route response to the job's session
+        await this.routeJobResponse(job.name, job.prompt, result.response, job.channel, sessionId);
 
         this.addToHistory({
           jobName: job.name,
@@ -380,9 +388,9 @@ export class CronScheduler {
   /**
    * Route job response to appropriate channel(s).
    * Skips notification if response is just HEARTBEAT_OK (nothing to report).
-   * Always sends to desktop, and also to Telegram if configured.
+   * Always sends to desktop (to the correct session), and also to Telegram if configured.
    */
-  private async routeJobResponse(jobName: string, prompt: string, response: string, channel: string): Promise<void> {
+  private async routeJobResponse(jobName: string, prompt: string, response: string, channel: string, sessionId: string = 'default'): Promise<void> {
     // Check for silent acknowledgment - agent has nothing to report
     // Match HEARTBEAT_OK anywhere in response (case-insensitive)
     if (response.toUpperCase().includes(HEARTBEAT_OK)) {
@@ -390,39 +398,47 @@ export class CronScheduler {
       return;
     }
 
-    // Always send to desktop (notification + chat)
+    // Always send to desktop (notification + chat to the correct session)
     const plainResponse = this.stripMarkdown(response);
     if (this.onNotification) {
       this.onNotification('Pocket Agent', plainResponse.slice(0, 200));
     }
     if (this.onChatMessage) {
-      this.onChatMessage(jobName, prompt, response);
+      this.onChatMessage(jobName, prompt, response, sessionId);
     }
 
-    // Also send to Telegram if configured
-    if (channel === 'telegram' && this.telegramBot) {
-      await this.telegramBot.broadcast(`📅 ${jobName}\n\n${response}`);
+    // Also send to Telegram if configured AND session has a linked chat
+    if (channel === 'telegram' && this.telegramBot && this.memory) {
+      const linkedChatId = this.memory.getChatForSession(sessionId);
+      if (linkedChatId) {
+        await this.telegramBot.sendMessage(linkedChatId, `📅 ${jobName}\n\n${response}`);
+      }
+      // No broadcast fallback - only send to session's linked chat
     }
   }
 
   /**
    * Send a reminder notification.
-   * Always sends to desktop, and also to Telegram if configured.
+   * Always sends to desktop (to the correct session), and also to Telegram if configured.
    */
-  private async sendReminder(type: 'calendar' | 'task', title: string, message: string, channel: string): Promise<void> {
-    console.log(`[Scheduler] Sending ${type} reminder: ${title}`);
+  private async sendReminder(type: 'calendar' | 'task', title: string, message: string, channel: string, sessionId: string = 'default'): Promise<void> {
+    console.log(`[Scheduler] Sending ${type} reminder: ${title} (session: ${sessionId})`);
 
-    // Always send to desktop (notification + chat)
+    // Always send to desktop (notification + chat to the correct session)
     if (this.onNotification) {
       this.onNotification('Pocket Agent', message);
     }
     if (this.onChatMessage) {
-      this.onChatMessage(`${type}_reminder`, message, message);
+      this.onChatMessage(`${type}_reminder`, message, message, sessionId);
     }
 
-    // Also send to Telegram if configured
-    if (channel === 'telegram' && this.telegramBot) {
-      await this.telegramBot.broadcast(`${type === 'calendar' ? '📅' : '✓'} ${message}`);
+    // Also send to Telegram if configured AND session has a linked chat
+    if (channel === 'telegram' && this.telegramBot && this.memory) {
+      const linkedChatId = this.memory.getChatForSession(sessionId);
+      if (linkedChatId) {
+        await this.telegramBot.sendMessage(linkedChatId, `${type === 'calendar' ? '📅' : '✓'} ${message}`);
+      }
+      // No broadcast fallback - only send to session's linked chat
     }
 
     // Log to history
@@ -574,18 +590,23 @@ export class CronScheduler {
    * Route response to appropriate channel
    */
   private async routeResponse(job: ScheduledJob, response: string): Promise<void> {
+    const sessionId = job.sessionId || 'default';
     switch (job.channel) {
       case 'telegram':
         if (this.telegramBot) {
           if (job.recipient) {
-            // Send to specific chat
+            // Send to specific chat (explicitly specified)
             const chatId = parseInt(job.recipient, 10);
             if (!isNaN(chatId)) {
               await this.telegramBot.sendMessage(chatId, `📅 ${job.name}\n\n${response}`);
             }
-          } else {
-            // Broadcast to all active chats
-            await this.telegramBot.broadcast(`📅 ${job.name}\n\n${response}`);
+          } else if (this.memory) {
+            // Send to session's linked chat only - no broadcast fallback
+            const linkedChatId = this.memory.getChatForSession(sessionId);
+            if (linkedChatId) {
+              await this.telegramBot.sendMessage(linkedChatId, `📅 ${job.name}\n\n${response}`);
+            }
+            // If no linked chat, skip Telegram (will still go to desktop via other code paths)
           }
         } else {
           console.warn(`[Scheduler] Telegram not available for job: ${job.name}`);
@@ -594,8 +615,8 @@ export class CronScheduler {
 
       case 'desktop':
       case 'default':
-        // Send to chat window AND show notification
-        this.emitChatMessage(job.name, job.prompt, response);
+        // Send to chat window AND show notification (to the correct session)
+        this.emitChatMessage(job.name, job.prompt, response, sessionId);
         // Notification: friendly title, plain text body (strip markdown)
         const plainResponse = this.stripMarkdown(response);
         this.emitDesktopNotification('Pocket Agent', plainResponse.slice(0, 200));
@@ -618,9 +639,9 @@ export class CronScheduler {
   /**
    * Emit chat message (sends to chat window)
    */
-  private emitChatMessage(jobName: string, prompt: string, response: string): void {
+  private emitChatMessage(jobName: string, prompt: string, response: string, sessionId: string = 'default'): void {
     if (this.onChatMessage) {
-      this.onChatMessage(jobName, prompt, response);
+      this.onChatMessage(jobName, prompt, response, sessionId);
     }
   }
 
@@ -658,12 +679,12 @@ export class CronScheduler {
   /**
    * Set chat message handler (for sending to chat window)
    */
-  setChatHandler(handler: (jobName: string, prompt: string, response: string) => void): void {
+  setChatHandler(handler: (jobName: string, prompt: string, response: string, sessionId: string) => void): void {
     this.onChatMessage = handler;
   }
 
   private onNotification?: (title: string, body: string) => void;
-  private onChatMessage?: (jobName: string, prompt: string, response: string) => void;
+  private onChatMessage?: (jobName: string, prompt: string, response: string, sessionId: string) => void;
 
   /**
    * Add result to history

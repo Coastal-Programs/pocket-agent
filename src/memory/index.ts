@@ -331,6 +331,65 @@ export class MemoryManager {
 
     // Migration: create default session and migrate orphan messages
     this.migrateToDefaultSession();
+
+    // Migration: add session_id to calendar_events, tasks, and cron_jobs
+    this.migrateSessionScopedTables();
+  }
+
+  /**
+   * Add session_id column to calendar_events, tasks, and cron_jobs tables
+   * and migrate existing records to the default session
+   */
+  private migrateSessionScopedTables(): void {
+    const DEFAULT_SESSION_ID = 'default';
+
+    // Helper to check if column exists
+    const hasColumn = (table: string, column: string): boolean => {
+      const columns = this.db.pragma(`table_info(${table})`) as Array<{ name: string }>;
+      return columns.some(c => c.name === column);
+    };
+
+    // Migrate calendar_events
+    if (!hasColumn('calendar_events', 'session_id')) {
+      this.db.exec(`ALTER TABLE calendar_events ADD COLUMN session_id TEXT REFERENCES sessions(id)`);
+      const count = (this.db.prepare('SELECT COUNT(*) as c FROM calendar_events WHERE session_id IS NULL').get() as { c: number }).c;
+      if (count > 0) {
+        this.db.prepare('UPDATE calendar_events SET session_id = ? WHERE session_id IS NULL').run(DEFAULT_SESSION_ID);
+        console.log(`[Memory] Migrated ${count} calendar events to default session`);
+      }
+      console.log('[Memory] Migrated calendar_events table: added session_id column');
+    }
+
+    // Migrate tasks
+    if (!hasColumn('tasks', 'session_id')) {
+      this.db.exec(`ALTER TABLE tasks ADD COLUMN session_id TEXT REFERENCES sessions(id)`);
+      const count = (this.db.prepare('SELECT COUNT(*) as c FROM tasks WHERE session_id IS NULL').get() as { c: number }).c;
+      if (count > 0) {
+        this.db.prepare('UPDATE tasks SET session_id = ? WHERE session_id IS NULL').run(DEFAULT_SESSION_ID);
+        console.log(`[Memory] Migrated ${count} tasks to default session`);
+      }
+      console.log('[Memory] Migrated tasks table: added session_id column');
+    }
+
+    // Migrate cron_jobs
+    if (!hasColumn('cron_jobs', 'session_id')) {
+      this.db.exec(`ALTER TABLE cron_jobs ADD COLUMN session_id TEXT REFERENCES sessions(id)`);
+      const count = (this.db.prepare('SELECT COUNT(*) as c FROM cron_jobs WHERE session_id IS NULL').get() as { c: number }).c;
+      if (count > 0) {
+        this.db.prepare('UPDATE cron_jobs SET session_id = ? WHERE session_id IS NULL').run(DEFAULT_SESSION_ID);
+        console.log(`[Memory] Migrated ${count} cron jobs to default session`);
+      }
+      console.log('[Memory] Migrated cron_jobs table: added session_id column');
+    }
+
+    // Create indexes for session filtering
+    try {
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_calendar_session ON calendar_events(session_id)`);
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id)`);
+      this.db.exec(`CREATE INDEX IF NOT EXISTS idx_cron_session ON cron_jobs(session_id)`);
+    } catch {
+      // Indexes may already exist
+    }
   }
 
   /**

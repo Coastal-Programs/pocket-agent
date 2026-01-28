@@ -1,5 +1,5 @@
 import { MemoryManager, Message } from '../memory';
-import { buildMCPServers, buildSdkMcpServers, setMemoryManager, ToolsConfig, validateToolsConfig } from '../tools';
+import { buildMCPServers, buildSdkMcpServers, setMemoryManager, ToolsConfig, validateToolsConfig, setCurrentSessionId } from '../tools';
 import { closeBrowserManager } from '../browser';
 import { loadIdentity } from '../config/identity';
 import { loadInstructions } from '../config/instructions';
@@ -164,6 +164,9 @@ class AgentManagerClass extends EventEmitter {
     this.abortControllersBySession.set(sessionId, abortController);
     this.lastSuggestedPrompt = undefined;
     let wasCompacted = false;
+
+    // Set session context for MCP tools to use
+    setCurrentSessionId(sessionId);
 
     try {
       const { maxContextTokens, compactionThreshold } = getTokenLimits();

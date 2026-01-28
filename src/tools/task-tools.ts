@@ -9,6 +9,7 @@
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
+import { getCurrentSessionId } from './session-context';
 
 // Shared database connection (singleton pattern to prevent locks)
 let sharedDb: Database.Database | null = null;
@@ -175,11 +176,13 @@ function ensureTable(db: Database.Database): void {
       reminder_minutes INTEGER,
       reminded INTEGER DEFAULT 0,
       channel TEXT DEFAULT 'desktop',
+      session_id TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
     CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due_date);
     CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_tasks_session ON tasks(session_id);
   `);
 }
 
@@ -246,11 +249,12 @@ export async function handleTaskAddTool(input: unknown): Promise<string> {
 
   try {
     const db = getDb();
+    const sessionId = getCurrentSessionId();
 
     const result = db.prepare(`
-      INSERT INTO tasks (title, description, due_date, priority, reminder_minutes, channel)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).run(params.title, params.description || null, dueDate, priority, params.reminder_minutes || null, channel);
+      INSERT INTO tasks (title, description, due_date, priority, reminder_minutes, channel, session_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(params.title, params.description || null, dueDate, priority, params.reminder_minutes || null, channel, sessionId);
 
     return JSON.stringify({
       success: true,
@@ -258,6 +262,7 @@ export async function handleTaskAddTool(input: unknown): Promise<string> {
       title: params.title,
       due: dueDate ? formatDateTime(dueDate) : null,
       priority,
+      session_id: sessionId,
     });
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Unknown error';
@@ -297,12 +302,13 @@ export async function handleTaskListTool(input: unknown): Promise<string> {
 
   try {
     const db = getDb();
+    const sessionId = getCurrentSessionId();
 
-    let query = 'SELECT * FROM tasks';
-    const queryParams: string[] = [];
+    let query = 'SELECT * FROM tasks WHERE session_id = ?';
+    const queryParams: string[] = [sessionId];
 
     if (statusFilter !== 'all') {
-      query += ' WHERE status = ?';
+      query += ' AND status = ?';
       queryParams.push(statusFilter);
     }
 
@@ -450,15 +456,16 @@ export async function handleTaskDueTool(input: unknown): Promise<string> {
 
   try {
     const db = getDb();
+    const sessionId = getCurrentSessionId();
 
     const now = new Date();
     const later = new Date(now.getTime() + hours * 3600000);
 
     const tasks = db.prepare(`
       SELECT * FROM tasks
-      WHERE status != 'completed' AND due_date IS NOT NULL AND due_date <= ?
+      WHERE session_id = ? AND status != 'completed' AND due_date IS NOT NULL AND due_date <= ?
       ORDER BY due_date ASC
-    `).all(later.toISOString()) as Array<{
+    `).all(sessionId, later.toISOString()) as Array<{
       id: number;
       title: string;
       due_date: string;
