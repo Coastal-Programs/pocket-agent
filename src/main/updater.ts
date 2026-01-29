@@ -86,7 +86,14 @@ export function initializeUpdater(): void {
 
   autoUpdater.on('error', (error: Error) => {
     console.error('[Updater] Error:', error.message);
-    currentStatus = { status: 'error', error: error.message };
+    let errorMsg = error.message;
+
+    // Provide user-friendly message for read-only volume error
+    if (error.message.includes('read-only volume')) {
+      errorMsg = 'Move Pocket Agent to Applications folder to enable updates.';
+    }
+
+    currentStatus = { status: 'error', error: errorMsg };
     sendStatusToRenderer();
   });
 
