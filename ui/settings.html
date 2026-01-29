@@ -1223,6 +1223,23 @@
       const navItems = document.querySelectorAll('.nav-item');
       const sections = document.querySelectorAll('.section');
 
+      // Sync initial state: ensure first nav item and section are active
+      navItems.forEach((item, index) => {
+        if (index === 0) {
+          item.classList.add('active');
+        } else {
+          item.classList.remove('active');
+        }
+      });
+
+      sections.forEach((section, index) => {
+        if (index === 0) {
+          section.classList.add('active');
+        } else {
+          section.classList.remove('active');
+        }
+      });
+
       navItems.forEach(item => {
         item.addEventListener('click', () => {
           const sectionId = item.dataset.section;

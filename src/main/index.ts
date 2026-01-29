@@ -10,6 +10,7 @@ import { SettingsManager } from '../settings';
 import { loadIdentity, saveIdentity, getIdentityPath } from '../config/identity';
 import { loadInstructions, saveInstructions, getInstructionsPath } from '../config/instructions';
 import { closeTaskDb } from '../tools';
+import { initializeUpdater, setupUpdaterIPC, setSettingsWindow } from './updater';
 import cityTimezones from 'city-timezones';
 
 // Fix PATH for packaged apps - node/npm binaries aren't in PATH when launched from Finder
@@ -700,7 +701,10 @@ function openSettingsWindow(): void {
 
   settingsWindow = new BrowserWindow(windowOptions);
 
-  settingsWindow.loadFile(path.join(__dirname, '../../ui/settings.html'));
+  // Clear cache to ensure fresh HTML loads during development
+  settingsWindow.webContents.session.clearCache().then(() => {
+    settingsWindow?.loadFile(path.join(__dirname, '../../ui/settings.html'));
+  });
 
   settingsWindow.once('ready-to-show', () => {
     settingsWindow?.show();
@@ -716,8 +720,12 @@ function openSettingsWindow(): void {
   settingsWindow.on('close', saveBounds);
 
   settingsWindow.on('closed', () => {
+    setSettingsWindow(null);
     settingsWindow = null;
   });
+
+  // Connect updater to settings window for status updates
+  setSettingsWindow(settingsWindow);
 }
 
 function openSetupWindow(): void {
@@ -1245,8 +1253,8 @@ function setupIPC(): void {
     return scheduler?.getAllJobs() || [];
   });
 
-  ipcMain.handle('cron:create', async (_, name: string, schedule: string, prompt: string, channel: string) => {
-    const success = await scheduler?.createJob(name, schedule, prompt, channel);
+  ipcMain.handle('cron:create', async (_, name: string, schedule: string, prompt: string, channel: string, sessionId: string) => {
+    const success = await scheduler?.createJob(name, schedule, prompt, channel, sessionId || 'default');
     updateTrayMenu();
     return { success };
   });
@@ -1270,6 +1278,11 @@ function setupIPC(): void {
 
   ipcMain.handle('cron:history', async (_, limit: number = 20) => {
     return scheduler?.getHistory(limit) || [];
+  });
+
+  // App info
+  ipcMain.handle('app:getVersion', () => {
+    return app.getVersion();
   });
 
   // Settings
@@ -1833,9 +1846,16 @@ app.whenReady().then(async () => {
     console.log('[Main] Memory initialized');
 
     setupIPC();
+    setupUpdaterIPC();
     console.log('[Main] Creating tray...');
     await createTray();
     console.log('[Main] Tray created');
+
+    // Initialize auto-updater (only in packaged app)
+    if (app.isPackaged) {
+      initializeUpdater();
+      console.log('[Main] Auto-updater initialized');
+    }
 
     // Register global shortcut (Option+Z on macOS, Alt+Z on Windows/Linux)
     const shortcut = process.platform === 'darwin' ? 'Alt+Z' : 'Alt+Z';

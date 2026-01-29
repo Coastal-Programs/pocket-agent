@@ -272,7 +272,7 @@ export class CronScheduler {
         }
 
         const result = await AgentManager.processMessage(
-          `[Scheduled: ${job.name}] ${fullPrompt}`,
+          fullPrompt,
           `cron:${job.name}`,
           sessionId
         );
@@ -411,7 +411,7 @@ export class CronScheduler {
     if (channel === 'telegram' && this.telegramBot && this.memory) {
       const linkedChatId = this.memory.getChatForSession(sessionId);
       if (linkedChatId) {
-        await this.telegramBot.sendMessage(linkedChatId, `📅 ${jobName}\n\n${response}`);
+        await this.telegramBot.sendMessage(linkedChatId, response);
       }
       // No broadcast fallback - only send to session's linked chat
     }
@@ -703,7 +703,8 @@ export class CronScheduler {
     name: string,
     schedule: string,
     prompt: string,
-    channel: string = 'default'
+    channel: string = 'default',
+    sessionId: string = 'default'
   ): Promise<boolean> {
     if (!this.memory) return false;
 
@@ -713,7 +714,7 @@ export class CronScheduler {
     }
 
     // Save to database
-    const id = this.memory.saveCronJob(name, schedule, prompt, channel);
+    const id = this.memory.saveCronJob(name, schedule, prompt, channel, sessionId);
 
     // Schedule it
     const job: ScheduledJob = {
@@ -724,6 +725,7 @@ export class CronScheduler {
       channel,
       recipient: this.extractRecipient(prompt),
       enabled: true,
+      sessionId,
     };
 
     return this.scheduleJob(job);

@@ -65,12 +65,15 @@ contextBridge.exposeInMainWorld('pocketAgent', {
 
   // Cron
   getCronJobs: () => ipcRenderer.invoke('cron:list'),
-  createCronJob: (name: string, schedule: string, prompt: string, channel: string) =>
-    ipcRenderer.invoke('cron:create', name, schedule, prompt, channel),
+  createCronJob: (name: string, schedule: string, prompt: string, channel: string, sessionId: string) =>
+    ipcRenderer.invoke('cron:create', name, schedule, prompt, channel, sessionId),
   deleteCronJob: (name: string) => ipcRenderer.invoke('cron:delete', name),
   toggleCronJob: (name: string, enabled: boolean) => ipcRenderer.invoke('cron:toggle', name, enabled),
   runCronJob: (name: string) => ipcRenderer.invoke('cron:run', name),
   getCronHistory: (limit?: number) => ipcRenderer.invoke('cron:history', limit),
+
+  // App info
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
 
   // Settings
   getSettings: () => ipcRenderer.invoke('settings:getAll'),
@@ -101,6 +104,17 @@ contextBridge.exposeInMainWorld('pocketAgent', {
   getSkillSetupConfig: (skillName: string) => ipcRenderer.invoke('skills:getSetupConfig', skillName),
   runSkillSetupCommand: (params: { skillName: string; stepId: string; inputs?: Record<string, string> }) =>
     ipcRenderer.invoke('skills:runSetupCommand', params),
+
+  // Updates
+  checkForUpdates: () => ipcRenderer.invoke('updater:checkForUpdates'),
+  downloadUpdate: () => ipcRenderer.invoke('updater:downloadUpdate'),
+  installUpdate: () => ipcRenderer.invoke('updater:installUpdate'),
+  getUpdateStatus: () => ipcRenderer.invoke('updater:getStatus'),
+  onUpdateStatus: (callback: (status: { status: string; info?: unknown; progress?: { percent: number }; error?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: { status: string; info?: unknown; progress?: { percent: number }; error?: string }) => callback(status);
+    ipcRenderer.on('updater:status', listener);
+    return () => ipcRenderer.removeListener('updater:status', listener);
+  },
 });
 
 // Session type
@@ -159,12 +173,14 @@ declare global {
       // Location and timezone
       lookupLocation: (query: string) => Promise<Array<{ city: string; country: string; province: string; timezone: string; display: string }>>;
       getTimezones: () => Promise<string[]>;
-      getCronJobs: () => Promise<Array<{ id: number; name: string; schedule: string; prompt: string; channel: string; enabled: boolean }>>;
-      createCronJob: (name: string, schedule: string, prompt: string, channel: string) => Promise<{ success: boolean }>;
+      getCronJobs: () => Promise<Array<{ id: number; name: string; schedule_type?: string; schedule: string | null; run_at?: string | null; interval_ms?: number | null; prompt: string; channel: string; enabled: boolean; session_id?: string | null }>>;
+      createCronJob: (name: string, schedule: string, prompt: string, channel: string, sessionId: string) => Promise<{ success: boolean }>;
       deleteCronJob: (name: string) => Promise<{ success: boolean }>;
       toggleCronJob: (name: string, enabled: boolean) => Promise<{ success: boolean }>;
       runCronJob: (name: string) => Promise<{ jobName: string; response: string; success: boolean; error?: string } | null>;
       getCronHistory: (limit?: number) => Promise<Array<{ jobName: string; response: string; success: boolean; timestamp: string }>>;
+      // App info
+      getAppVersion: () => Promise<string>;
       // Settings
       getSettings: () => Promise<Record<string, string>>;
       getSetting: (key: string) => Promise<string>;
@@ -223,6 +239,12 @@ declare global {
         };
       }>;
       runSkillSetupCommand: (command: string) => Promise<{ success: boolean; output?: string; error?: string }>;
+      // Updates
+      checkForUpdates: () => Promise<{ status: string; info?: { version: string }; error?: string }>;
+      downloadUpdate: () => Promise<{ success: boolean; error?: string }>;
+      installUpdate: () => Promise<{ success: boolean; error?: string }>;
+      getUpdateStatus: () => Promise<{ status: string; info?: { version: string }; progress?: { percent: number }; error?: string }>;
+      onUpdateStatus: (callback: (status: { status: string; info?: { version: string }; progress?: { percent: number }; error?: string }) => void) => () => void;
     };
   }
 }

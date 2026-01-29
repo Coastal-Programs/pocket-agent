@@ -199,6 +199,25 @@
       line-height: 1.4;
     }
 
+    /* Name + Session row */
+    .name-session-row {
+      display: flex;
+      gap: 8px;
+      flex: 1;
+      max-width: 280px;
+    }
+
+    .name-session-row input {
+      flex: 1;
+      max-width: none;
+    }
+
+    .name-session-row select {
+      width: 110px;
+      flex-shrink: 0;
+      max-width: none;
+    }
+
     /* Schedule tabs */
     .schedule-tabs {
       display: flex;
@@ -254,7 +273,7 @@
     }
 
     .day-btn {
-      width: 28px;
+      width: 36px;
       height: 28px;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -284,13 +303,15 @@
       gap: 6px;
     }
 
-    .interval-input input {
-      width: 50px;
+    .interval-input select {
+      width: 60px;
       text-align: center;
     }
 
-    .interval-input select {
-      width: 80px;
+    .interval-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-right: 4px;
     }
 
     /* Schedule options container */
@@ -395,6 +416,19 @@
       font-weight: 600;
       font-size: 13px;
       margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .job-session-badge {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 6px;
     }
 
     .job-schedule {
@@ -527,7 +561,12 @@
       <div class="settings-grid">
         <div class="setting-row">
           <label>Job Name</label>
-          <input type="text" id="job-name" placeholder="morning-vibes" />
+          <div class="name-session-row">
+            <input type="text" id="job-name" placeholder="morning-vibes" />
+            <select id="job-session">
+              <option value="default">Default</option>
+            </select>
+          </div>
         </div>
 
         <div class="setting-row schedule-row">
@@ -565,23 +604,40 @@
 
           <div class="schedule-options" id="options-interval">
             <div class="interval-input">
-              <input type="number" id="interval-value" value="30" min="1" max="60" />
-              <select id="interval-unit">
-                <option value="minutes">minutes</option>
-                <option value="hours">hours</option>
+              <select id="interval-hours">
+                <option value="0" selected>0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="6">6</option>
+                <option value="8">8</option>
+                <option value="12">12</option>
+                <option value="24">24</option>
               </select>
+              <span class="interval-label">hrs</span>
+              <select id="interval-minutes">
+                <option value="0">0</option>
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="20">20</option>
+                <option value="30" selected>30</option>
+                <option value="45">45</option>
+              </select>
+              <span class="interval-label">mins</span>
             </div>
           </div>
 
           <div class="schedule-options" id="options-custom">
             <div class="day-selector">
-              <button type="button" class="day-btn" data-day="0">Su</button>
-              <button type="button" class="day-btn" data-day="1">Mo</button>
-              <button type="button" class="day-btn" data-day="2">Tu</button>
-              <button type="button" class="day-btn" data-day="3">We</button>
-              <button type="button" class="day-btn" data-day="4">Th</button>
-              <button type="button" class="day-btn" data-day="5">Fr</button>
-              <button type="button" class="day-btn" data-day="6">Sa</button>
+              <button type="button" class="day-btn" data-day="0">Sun</button>
+              <button type="button" class="day-btn" data-day="1">Mon</button>
+              <button type="button" class="day-btn" data-day="2">Tue</button>
+              <button type="button" class="day-btn" data-day="3">Wed</button>
+              <button type="button" class="day-btn" data-day="4">Thu</button>
+              <button type="button" class="day-btn" data-day="5">Fri</button>
+              <button type="button" class="day-btn" data-day="6">Sat</button>
             </div>
             <div class="time-picker">
               <select id="hour-custom"></select>
@@ -700,12 +756,24 @@
     // Build cron expression from UI
     function buildCronExpression() {
       if (currentScheduleType === 'interval') {
-        const value = document.getElementById('interval-value').value;
-        const unit = document.getElementById('interval-unit').value;
-        if (unit === 'minutes') {
-          return `*/${value} * * * *`;
+        const hours = parseInt(document.getElementById('interval-hours').value);
+        const minutes = parseInt(document.getElementById('interval-minutes').value);
+
+        // Convert to total minutes for the cron expression
+        const totalMinutes = (hours * 60) + minutes;
+
+        if (totalMinutes === 0) {
+          // Default to 30 minutes if nothing selected
+          return `*/30 * * * *`;
+        } else if (hours > 0 && minutes === 0) {
+          // Pure hours interval
+          return `0 */${hours} * * *`;
+        } else if (hours === 0) {
+          // Pure minutes interval
+          return `*/${minutes} * * * *`;
         } else {
-          return `0 */${value} * * *`;
+          // Mixed hours and minutes - use total minutes
+          return `*/${totalMinutes} * * * *`;
         }
       }
 
@@ -730,8 +798,46 @@
       }
     }
 
-    // Convert cron to human-readable
-    function cronToHuman(cron) {
+    // Convert job schedule to human-readable
+    function scheduleToHuman(job) {
+      const scheduleType = job.schedule_type || 'cron';
+
+      // Handle 'at' type (one-time scheduled)
+      if (scheduleType === 'at' && job.run_at) {
+        const runAt = new Date(job.run_at);
+        const now = new Date();
+        const isToday = runAt.toDateString() === now.toDateString();
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        const isTomorrow = runAt.toDateString() === tomorrow.toDateString();
+
+        const h = runAt.getHours();
+        const m = runAt.getMinutes();
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        const displayHour = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const displayMinute = m.toString().padStart(2, '0');
+        const timeStr = `${displayHour}:${displayMinute} ${ampm}`;
+
+        if (isToday) return `Today at ${timeStr}`;
+        if (isTomorrow) return `Tomorrow at ${timeStr}`;
+        return `${runAt.toLocaleDateString()} at ${timeStr}`;
+      }
+
+      // Handle 'every' type (interval-based)
+      if (scheduleType === 'every' && job.interval_ms) {
+        const ms = job.interval_ms;
+        if (ms < 60000) return `Every ${Math.round(ms / 1000)} seconds`;
+        if (ms < 3600000) return `Every ${Math.round(ms / 60000)} minutes`;
+        if (ms < 86400000) {
+          const hrs = Math.round(ms / 3600000);
+          return `Every ${hrs} hour${hrs === 1 ? '' : 's'}`;
+        }
+        const days = Math.round(ms / 86400000);
+        return `Every ${days} day${days === 1 ? '' : 's'}`;
+      }
+
+      // Handle 'cron' type
+      const cron = job.schedule;
       if (!cron) return 'Unknown schedule';
 
       const parts = cron.split(' ');
@@ -739,7 +845,7 @@
 
       const [minute, hour, dom, month, dow] = parts;
 
-      // Interval patterns
+      // Interval patterns in cron
       if (minute.startsWith('*/')) {
         const mins = minute.slice(2);
         return `Every ${mins} minutes`;
@@ -777,12 +883,37 @@
     }
 
     const jobsList = document.getElementById('jobs-list');
+    let sessionsMap = {}; // Map session_id to session name
 
-    window.addEventListener('DOMContentLoaded', loadJobs);
+    window.addEventListener('DOMContentLoaded', async () => {
+      await loadSessions();
+      await loadJobs();
+    });
+
+    async function loadSessions() {
+      try {
+        const sessions = await window.pocketAgent.getSessions();
+        const sessionSelect = document.getElementById('job-session');
+        sessionsMap = {};
+
+        sessionSelect.innerHTML = sessions.map(s => {
+          sessionsMap[s.id] = s.name;
+          const isDefault = s.id === 'default';
+          return `<option value="${escapeAttr(s.id)}"${isDefault ? ' selected' : ''}>${escapeHtml(s.name)}</option>`;
+        }).join('');
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+      }
+    }
 
     async function loadJobs() {
       try {
-        const jobs = await window.pocketAgent.getCronJobs();
+        const allJobs = await window.pocketAgent.getCronJobs();
+        // Filter to only show recurring jobs (cron and every types), not one-time 'at' jobs
+        const jobs = allJobs.filter(job => {
+          const scheduleType = job.schedule_type || 'cron';
+          return scheduleType !== 'at';
+        });
 
         if (jobs.length === 0) {
           jobsList.innerHTML = `
@@ -797,12 +928,14 @@
           return;
         }
 
-        jobsList.innerHTML = jobs.map((job, i) => `
+        jobsList.innerHTML = jobs.map((job, i) => {
+          const sessionName = sessionsMap[job.session_id] || job.session_id || 'Default';
+          return `
           <div class="job-item ${job.enabled ? '' : 'disabled'}" style="animation-delay: ${i * 50}ms">
             <div class="job-status"></div>
             <div class="job-info">
-              <div class="job-name">${escapeHtml(job.name)}</div>
-              <div class="job-schedule">${cronToHuman(job.schedule)}</div>
+              <div class="job-name">${escapeHtml(job.name)}<span class="job-session-badge">${escapeHtml(sessionName)}</span></div>
+              <div class="job-schedule">${scheduleToHuman(job)}</div>
               <div class="job-prompt">${escapeHtml(job.prompt)}</div>
             </div>
             <div class="job-actions">
@@ -824,7 +957,7 @@
               </button>
             </div>
           </div>
-        `).join('');
+        `}).join('');
       } catch (err) {
         jobsList.innerHTML = `<div class="empty-state"><p>Error: ${escapeHtml(err.message)}</p></div>`;
       }
@@ -833,6 +966,7 @@
     async function createJob() {
       const name = document.getElementById('job-name').value.trim();
       const prompt = document.getElementById('job-prompt').value.trim();
+      const sessionId = document.getElementById('job-session').value;
 
       if (!name || !prompt) {
         showToast('Please fill in name and prompt', 'error');
@@ -842,7 +976,7 @@
       const schedule = buildCronExpression();
 
       try {
-        const result = await window.pocketAgent.createCronJob(name, schedule, prompt, 'default');
+        const result = await window.pocketAgent.createCronJob(name, schedule, prompt, 'default', sessionId);
         if (result.success) {
           document.getElementById('job-name').value = '';
           document.getElementById('job-prompt').value = '';

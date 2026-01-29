@@ -49,6 +49,7 @@ export interface CronJob {
   delete_after_run?: boolean;
   context_messages?: number;
   next_run_at?: string | null;
+  session_id?: string | null;
 }
 
 export interface ConversationContext {
@@ -1660,17 +1661,19 @@ export class MemoryManager {
     name: string,
     schedule: string,
     prompt: string,
-    channel: string = 'default'
+    channel: string = 'default',
+    sessionId: string = 'default'
   ): number {
     const stmt = this.db.prepare(`
-      INSERT INTO cron_jobs (name, schedule, prompt, channel)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO cron_jobs (name, schedule, prompt, channel, session_id)
+      VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(name) DO UPDATE SET
         schedule = excluded.schedule,
         prompt = excluded.prompt,
-        channel = excluded.channel
+        channel = excluded.channel,
+        session_id = excluded.session_id
     `);
-    const result = stmt.run(name, schedule, prompt, channel);
+    const result = stmt.run(name, schedule, prompt, channel, sessionId);
     return result.lastInsertRowid as number;
   }
 
@@ -1682,12 +1685,23 @@ export class MemoryManager {
     const rows = stmt.all() as Array<{
       id: number;
       name: string;
-      schedule: string;
+      schedule_type: string;
+      schedule: string | null;
+      run_at: string | null;
+      interval_ms: number | null;
       prompt: string;
       channel: string;
       enabled: number;
+      delete_after_run: number;
+      context_messages: number;
+      next_run_at: string | null;
+      session_id: string | null;
     }>;
-    return rows.map(r => ({ ...r, enabled: r.enabled === 1 }));
+    return rows.map(r => ({
+      ...r,
+      enabled: r.enabled === 1,
+      delete_after_run: r.delete_after_run === 1,
+    }));
   }
 
   setCronJobEnabled(name: string, enabled: boolean): boolean {

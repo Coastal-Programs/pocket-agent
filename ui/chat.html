@@ -250,6 +250,18 @@
       -webkit-text-fill-color: transparent;
     }
 
+    .version-badge {
+      font-size: 9px;
+      font-weight: 500;
+      color: var(--text-muted);
+      background: var(--bg-tertiary);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 6px;
+      letter-spacing: 0;
+      -webkit-text-fill-color: var(--text-muted);
+    }
+
     .header-right {
       display: flex;
       align-items: center;
@@ -464,30 +476,6 @@
       color: var(--text-muted);
       font-size: 13px;
       padding: 8px 16px;
-    }
-
-    .message.reminder {
-      align-self: flex-start;
-      background: var(--assistant-bubble);
-      border: 1px solid var(--accent);
-      border-left: 3px solid var(--accent);
-      color: var(--text-primary);
-    }
-
-    .reminder-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 12px;
-      color: var(--accent);
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .reminder-header svg {
-      width: 14px;
-      height: 14px;
-      flex-shrink: 0;
     }
 
     .telegram-header {
@@ -1266,7 +1254,7 @@
   <header>
     <div class="header-left">
       <div class="status-dot"></div>
-      <h1>Pocket Agent</h1>
+      <h1>Pocket Agent<span id="version-badge" class="version-badge"></span></h1>
     </div>
     <div class="header-right">
       <div class="stats" id="stats"></div>
@@ -1450,6 +1438,14 @@
 
     // Initialize
     window.addEventListener('DOMContentLoaded', async () => {
+      // Load app version
+      try {
+        const version = await window.pocketAgent.getAppVersion();
+        document.getElementById('version-badge').textContent = `v${version}`;
+      } catch (err) {
+        console.error('Failed to load app version:', err);
+      }
+
       // Load sessions first, then load history for active session
       await loadSessions();
       await loadHistory();
@@ -1748,10 +1744,7 @@
       const emptyState = messagesDiv.querySelector('.empty-state');
       if (emptyState) emptyState.remove();
 
-      // Use the shared reminder rendering function
-      addReminderFromHistory(data.jobName, data.prompt, true);
-
-      // Add the agent's response
+      // Add the agent's response directly
       addMessage('assistant', data.response);
 
       // Update stats and scroll
@@ -1813,34 +1806,6 @@
       return wrapper;
     }
 
-    function addReminderFromHistory(jobName, prompt, animate = true, timestamp = null) {
-      // Create reminder message with icon
-      const reminderDiv = document.createElement('div');
-      reminderDiv.className = 'message reminder';
-      if (!animate) reminderDiv.style.animation = 'none';
-
-      const promptPreview = prompt.length > 100
-        ? prompt.slice(0, 100) + '...'
-        : prompt;
-
-      // Clock icon SVG
-      const clockIcon = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
-
-      const ts = timestamp ? new Date(timestamp) : new Date();
-
-      reminderDiv.innerHTML = `
-        <div class="reminder-header">
-          ${clockIcon}
-          <span>Scheduled: ${escapeHtml(jobName)}</span>
-        </div>
-        <div class="reminder-content">${escapeHtml(promptPreview)}</div>
-        <div class="message-timestamp">${formatTimestamp(ts)}</div>
-      `;
-
-      messagesDiv.appendChild(reminderDiv);
-      return reminderDiv;
-    }
-
     async function loadHistory() {
       try {
         const history = await window.pocketAgent.getHistory(100, currentSessionId);
@@ -1857,26 +1822,6 @@
             if (msgDate !== lastDate) {
               addTimestamp(msgDate);
               lastDate = msgDate;
-            }
-
-            // Check if this is a scheduled reminder (user message starts with [Scheduled: ...])
-            if (msg.role === 'user' && msg.content.startsWith('[Scheduled:')) {
-              // Extract job name and prompt from [Scheduled: jobname] prompt
-              const match = msg.content.match(/^\[Scheduled:\s*([^\]]+)\]\s*(.*)/s);
-              if (match) {
-                const jobName = match[1];
-                const prompt = match[2];
-
-                // Render as reminder
-                addReminderFromHistory(jobName, prompt, false, msg.timestamp);
-
-                // The next message should be the assistant's response
-                if (i + 1 < history.length && history[i + 1].role === 'assistant') {
-                  addMessage('assistant', history[i + 1].content, false, [], history[i + 1].timestamp);
-                  i++; // Skip the next message since we've handled it
-                }
-                continue;
-              }
             }
 
             addMessage(msg.role, msg.content, false, [], msg.timestamp);
