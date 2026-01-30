@@ -406,13 +406,16 @@ function updateTrayMenu(): void {
     ? `Messages: ${stats?.messageCount || 0} | Facts: ${stats?.factCount || 0}`
     : 'Not initialized';
 
-  // Load menu icon
-  const menuIconPath = path.join(__dirname, '../../assets/menu-icon.png');
+  // Load menu icon (use @2x version for retina sharpness)
+  const menuIconPath = path.join(__dirname, '../../assets/tray-icon@2x.png');
   let menuIcon: Electron.NativeImage | undefined;
   try {
-    menuIcon = nativeImage.createFromPath(menuIconPath);
-    if (!menuIcon.isEmpty()) {
-      menuIcon = menuIcon.resize({ width: 16, height: 16 });
+    const rawIcon = nativeImage.createFromPath(menuIconPath);
+    if (!rawIcon.isEmpty()) {
+      // Create multi-resolution image for retina support
+      menuIcon = nativeImage.createEmpty();
+      menuIcon.addRepresentation({ scaleFactor: 1, width: 16, height: 16, buffer: rawIcon.resize({ width: 16, height: 16 }).toPNG() });
+      menuIcon.addRepresentation({ scaleFactor: 2, width: 32, height: 32, buffer: rawIcon.resize({ width: 32, height: 32 }).toPNG() });
       menuIcon.setTemplateImage(true);
     } else {
       menuIcon = undefined;

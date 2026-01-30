@@ -7,7 +7,7 @@
   <title>Pocket Agent</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;700&family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <style>
     :root {
@@ -83,8 +83,9 @@
       border: 1px solid var(--border);
       border-bottom: none;
       color: var(--text-secondary);
+      font-family: 'Pixelify Sans', sans-serif;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 400;
       cursor: grab;
       border-radius: 8px 8px 0 0;
       transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease, opacity 0.15s ease, border-color 0.15s ease;
@@ -152,8 +153,9 @@
       border: 1px solid var(--accent);
       border-radius: 4px;
       color: var(--text-primary);
+      font-family: 'Pixelify Sans', sans-serif;
       font-size: 12px;
-      font-weight: 500;
+      font-weight: 400;
       padding: 2px 6px;
       width: 100px;
       outline: none;
@@ -225,25 +227,19 @@
       gap: 10px;
     }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-secondary) 100%);
-      box-shadow: 0 0 10px var(--accent);
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.7; transform: scale(0.9); }
+    .header-logo {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+      filter: invert(1) brightness(2);
+      image-rendering: -webkit-optimize-contrast;
     }
 
     header h1 {
-      font-family: 'Sora', sans-serif;
-      font-size: 14px;
+      font-family: 'Pixelify Sans', sans-serif;
+      font-size: 16px;
       font-weight: 700;
-      letter-spacing: -0.02em;
+      letter-spacing: 0;
       background: linear-gradient(135deg, var(--text-primary) 0%, var(--accent) 100%);
       -webkit-background-clip: text;
       background-clip: text;
@@ -770,17 +766,100 @@
     }
 
     .status-spinner {
-      width: 18px;
+      width: 24px;
       height: 18px;
-      border: 2px solid rgba(168, 85, 247, 0.2);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      background: transparent;
       flex-shrink: 0;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
+    .status-spinner::before {
+      content: '';
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      top: 0;
+      left: 0;
+      animation: pixelcat 0.6s steps(1) infinite;
+      image-rendering: pixelated;
+    }
+
+    @keyframes pixelcat {
+      /* Frame 1: Cat walking - legs apart */
+      0%, 25% {
+        box-shadow:
+          /* Ears */
+          3px 0 0 var(--accent), 9px 0 0 var(--accent),
+          /* Head */
+          3px 3px 0 var(--accent), 6px 3px 0 var(--accent), 9px 3px 0 var(--accent),
+          0 6px 0 var(--accent), 3px 6px 0 var(--accent), 6px 6px 0 var(--accent), 9px 6px 0 var(--accent), 12px 6px 0 var(--accent),
+          /* Eyes */
+          3px 6px 0 #fff, 9px 6px 0 #fff,
+          /* Body */
+          3px 9px 0 var(--accent), 6px 9px 0 var(--accent), 9px 9px 0 var(--accent), 12px 9px 0 var(--accent), 15px 9px 0 var(--accent),
+          3px 12px 0 var(--accent), 6px 12px 0 var(--accent), 9px 12px 0 var(--accent), 12px 12px 0 var(--accent),
+          /* Tail up */
+          18px 6px 0 var(--accent), 21px 3px 0 var(--accent),
+          /* Legs - apart */
+          3px 15px 0 var(--accent), 12px 15px 0 var(--accent);
+      }
+      /* Frame 2: Cat walking - legs together */
+      25.01%, 50% {
+        box-shadow:
+          /* Ears */
+          3px 0 0 var(--accent), 9px 0 0 var(--accent),
+          /* Head */
+          3px 3px 0 var(--accent), 6px 3px 0 var(--accent), 9px 3px 0 var(--accent),
+          0 6px 0 var(--accent), 3px 6px 0 var(--accent), 6px 6px 0 var(--accent), 9px 6px 0 var(--accent), 12px 6px 0 var(--accent),
+          /* Eyes */
+          3px 6px 0 #fff, 9px 6px 0 #fff,
+          /* Body */
+          3px 9px 0 var(--accent), 6px 9px 0 var(--accent), 9px 9px 0 var(--accent), 12px 9px 0 var(--accent), 15px 9px 0 var(--accent),
+          3px 12px 0 var(--accent), 6px 12px 0 var(--accent), 9px 12px 0 var(--accent), 12px 12px 0 var(--accent),
+          /* Tail middle */
+          18px 9px 0 var(--accent), 21px 6px 0 var(--accent),
+          /* Legs - together */
+          6px 15px 0 var(--accent), 9px 15px 0 var(--accent);
+      }
+      /* Frame 3: Cat walking - legs crossed */
+      50.01%, 75% {
+        box-shadow:
+          /* Ears */
+          3px 0 0 var(--accent), 9px 0 0 var(--accent),
+          /* Head */
+          3px 3px 0 var(--accent), 6px 3px 0 var(--accent), 9px 3px 0 var(--accent),
+          0 6px 0 var(--accent), 3px 6px 0 var(--accent), 6px 6px 0 var(--accent), 9px 6px 0 var(--accent), 12px 6px 0 var(--accent),
+          /* Eyes */
+          3px 6px 0 #fff, 9px 6px 0 #fff,
+          /* Body */
+          3px 9px 0 var(--accent), 6px 9px 0 var(--accent), 9px 9px 0 var(--accent), 12px 9px 0 var(--accent), 15px 9px 0 var(--accent),
+          3px 12px 0 var(--accent), 6px 12px 0 var(--accent), 9px 12px 0 var(--accent), 12px 12px 0 var(--accent),
+          /* Tail down */
+          18px 12px 0 var(--accent), 21px 9px 0 var(--accent),
+          /* Legs - reversed */
+          12px 15px 0 var(--accent), 3px 15px 0 var(--accent);
+      }
+      /* Frame 4: Cat walking - legs wide */
+      75.01%, 100% {
+        box-shadow:
+          /* Ears */
+          3px 0 0 var(--accent), 9px 0 0 var(--accent),
+          /* Head */
+          3px 3px 0 var(--accent), 6px 3px 0 var(--accent), 9px 3px 0 var(--accent),
+          0 6px 0 var(--accent), 3px 6px 0 var(--accent), 6px 6px 0 var(--accent), 9px 6px 0 var(--accent), 12px 6px 0 var(--accent),
+          /* Eyes */
+          3px 6px 0 #fff, 9px 6px 0 #fff,
+          /* Body */
+          3px 9px 0 var(--accent), 6px 9px 0 var(--accent), 9px 9px 0 var(--accent), 12px 9px 0 var(--accent), 15px 9px 0 var(--accent),
+          3px 12px 0 var(--accent), 6px 12px 0 var(--accent), 9px 12px 0 var(--accent), 12px 12px 0 var(--accent),
+          /* Tail up */
+          18px 6px 0 var(--accent), 21px 3px 0 var(--accent),
+          /* Legs - wide */
+          0 15px 0 var(--accent), 15px 15px 0 var(--accent);
+      }
     }
 
     .status-content {
@@ -791,8 +870,9 @@
     }
 
     .status-action {
+      font-family: 'Pixelify Sans', sans-serif;
       font-size: 13px;
-      font-weight: 500;
+      font-weight: 400;
       background: linear-gradient(
         90deg,
         var(--text-primary) 0%,
@@ -821,8 +901,7 @@
     }
 
     .status-indicator.subagent-active .status-spinner {
-      border-color: rgba(168, 85, 247, 0.3);
-      border-top-color: #a855f7;
+      /* Pixel cat already uses --accent which is purple */
     }
 
     .status-indicator.subagent-active .status-action {
@@ -1313,7 +1392,7 @@
 <body>
   <header>
     <div class="header-left">
-      <div class="status-dot"></div>
+      <img src="../assets/tray-icon@2x.png" alt="" class="header-logo">
       <h1>Pocket Agent<span id="version-badge" class="version-badge"></span><span id="model-badge" class="model-badge"></span></h1>
     </div>
     <div class="header-right">
@@ -2073,7 +2152,7 @@
         isLoadingBySession.set(sessionId, true);
         renderTabs();
         setButtonState(true);
-        const statusEl = addStatusIndicator('hmm let me think 🤔');
+        const statusEl = addStatusIndicator('*stretches paws* thinking... 🐱');
         statusElBySession.set(sessionId, statusEl);
       }
 
@@ -2404,12 +2483,12 @@
       const detailEl = statusEl.querySelector('.status-detail');
 
       if (status.type === 'thinking') {
-        actionEl.textContent = status.message || 'hmm let me think 🤔';
+        actionEl.textContent = status.message || '*stretches paws* thinking... 🐱';
         detailEl.textContent = '';
         detailEl.style.display = 'none';
         statusEl.classList.remove('subagent-active');
       } else if (status.type === 'tool_start') {
-        actionEl.textContent = status.toolName || 'doing something cool ✨';
+        actionEl.textContent = status.toolName || 'pouncing on it... 🐾';
         if (status.toolInput) {
           detailEl.textContent = status.toolInput;
           detailEl.title = status.toolInput;
@@ -2420,14 +2499,14 @@
         }
         statusEl.classList.remove('subagent-active');
       } else if (status.type === 'tool_end') {
-        actionEl.textContent = status.message || 'got it, thinking... 💭';
+        actionEl.textContent = status.message || 'caught it! processing... 😺';
         detailEl.textContent = '';
         detailEl.style.display = 'none';
         statusEl.classList.remove('subagent-active');
       } else if (status.type === 'subagent_start') {
         // Subagent spawned - show special status
         statusEl.classList.add('subagent-active');
-        actionEl.textContent = status.message || 'spawning helpers 🚀';
+        actionEl.textContent = status.message || 'summoning cat friends 🐱🐱';
         if (status.toolInput) {
           const countBadge = status.agentCount > 1 ? ` (${status.agentCount} active)` : '';
           detailEl.textContent = status.toolInput + countBadge;
@@ -2439,23 +2518,23 @@
         }
       } else if (status.type === 'subagent_update') {
         // Multiple subagents, one finished
-        actionEl.textContent = status.message || `${status.agentCount} helpers working 🔄`;
+        actionEl.textContent = status.message || `${status.agentCount} kitties on the job 🐾`;
         detailEl.textContent = '';
         detailEl.style.display = 'none';
       } else if (status.type === 'subagent_end') {
         // All subagents done
         statusEl.classList.remove('subagent-active');
-        actionEl.textContent = status.message || 'helpers done ✨';
+        actionEl.textContent = status.message || 'cat squad finished! ✨';
         detailEl.textContent = '';
         detailEl.style.display = 'none';
       } else if (status.type === 'responding') {
-        actionEl.textContent = 'cooking up a response... 👨‍🍳';
+        actionEl.textContent = 'grooming my response... 🐈';
         detailEl.textContent = '';
         detailEl.style.display = 'none';
         statusEl.classList.remove('subagent-active');
       } else if (status.type === 'queued') {
         // Message was queued - show queue position
-        actionEl.textContent = status.message || 'message queued 📋';
+        actionEl.textContent = status.message || 'in the litter queue 📋';
         if (status.queuePosition) {
           detailEl.textContent = `Position #${status.queuePosition} in queue`;
           detailEl.style.display = 'block';
@@ -2466,7 +2545,7 @@
         statusEl.classList.remove('subagent-active');
       } else if (status.type === 'queue_processing') {
         // Now processing a queued message
-        actionEl.textContent = status.message || 'processing queued message... 🔄';
+        actionEl.textContent = status.message || 'digging it up now... 🐾';
         if (status.queuedMessage) {
           detailEl.textContent = status.queuedMessage;
           detailEl.title = status.queuedMessage;
