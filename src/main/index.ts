@@ -1332,6 +1332,10 @@ function setupIPC(): void {
     return SettingsManager.validateMoonshotKey(key);
   });
 
+  ipcMain.handle('settings:validateGlm', async (_, key: string) => {
+    return SettingsManager.validateGlmKey(key);
+  });
+
   // Get available models based on configured API keys
   ipcMain.handle('settings:getAvailableModels', async () => {
     const models: Array<{ id: string; name: string; provider: string }> = [];
@@ -1354,6 +1358,14 @@ function setupIPC(): void {
     if (hasMoonshotKey) {
       models.push(
         { id: 'kimi-k2.5', name: 'Kimi K2.5', provider: 'moonshot' }
+      );
+    }
+
+    // Check for Z.AI GLM key
+    const hasGlmKey = SettingsManager.get('glm.apiKey');
+    if (hasGlmKey) {
+      models.push(
+        { id: 'glm-4.7', name: 'GLM 4.7', provider: 'glm' }
       );
     }
 

@@ -1036,6 +1036,21 @@
           </div>
         </div>
 
+        <h3 class="subsection-title" style="margin-top: 24px; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-secondary);">GLM (Z.AI)</h3>
+        <div class="keys-table" id="glm-api-key-section">
+          <div class="key-row">
+            <div class="key-info">
+              <span class="key-name">API Key</span>
+              <a href="https://z.ai/manage-apikey/apikey-list" target="_blank" class="key-link">z.ai</a>
+            </div>
+            <div class="key-input">
+              <input type="password" id="glm.apiKey" placeholder="...">
+              <button class="delete-btn" id="glm.apiKey-delete" onclick="playNormalClick(); deleteKey('glm.apiKey')"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg></button>
+              <button onclick="playNormalClick(); validateKey('glm')">Test</button>
+            </div>
+          </div>
+        </div>
+
         <h3 class="subsection-title" style="margin-top: 24px; margin-bottom: 12px; font-size: 14px; font-weight: 600; color: var(--text-secondary);">Model Settings</h3>
         <div class="settings-grid" id="brain-power-section">
           <div class="setting-row">
@@ -1402,6 +1417,7 @@
         // Add available models grouped by provider
         const anthropicModels = models.filter(m => m.provider === 'anthropic');
         const moonshotModels = models.filter(m => m.provider === 'moonshot');
+        const glmModels = models.filter(m => m.provider === 'glm');
 
         if (anthropicModels.length > 0) {
           const group = document.createElement('optgroup');
@@ -1419,6 +1435,18 @@
           const group = document.createElement('optgroup');
           group.label = 'Kimi (Moonshot)';
           for (const model of moonshotModels) {
+            const option = document.createElement('option');
+            option.value = model.id;
+            option.textContent = model.name;
+            group.appendChild(option);
+          }
+          dropdown.appendChild(group);
+        }
+
+        if (glmModels.length > 0) {
+          const group = document.createElement('optgroup');
+          group.label = 'GLM (Z.AI)';
+          for (const model of glmModels) {
             const option = document.createElement('option');
             option.value = model.id;
             option.textContent = model.name;
@@ -1605,6 +1633,10 @@
         pattern: /^sk-[A-Za-z0-9_-]{40,}$/,
         hint: 'Moonshot keys start with "sk-"'
       },
+      'glm.apiKey': {
+        pattern: /^.{10,}$/,
+        hint: 'Enter your Z.AI API key'
+      },
       'telegram.botToken': {
         pattern: /^\d{6,}:[A-Za-z0-9_-]{30,}$/,
         hint: 'Telegram tokens are in format "123456789:ABC..."'
@@ -1658,7 +1690,7 @@
       const keyIds = [
         'anthropic.apiKey', 'openai.apiKey', 'gemini.apiKey',
         'google.placesApiKey', 'notion.apiKey', 'elevenlabs.apiKey',
-        'moonshot.apiKey', 'telegram.botToken'
+        'moonshot.apiKey', 'glm.apiKey', 'telegram.botToken'
       ];
 
       for (const keyId of keyIds) {
@@ -1707,7 +1739,7 @@
         showToast('Key removed!', 'success');
 
         // Refresh model dropdown if this affects available models
-        if (keyId === 'anthropic.apiKey' || keyId === 'moonshot.apiKey') {
+        if (keyId === 'anthropic.apiKey' || keyId === 'moonshot.apiKey' || keyId === 'glm.apiKey') {
           await refreshModelDropdown();
           activateReboot();
         }
@@ -1818,7 +1850,7 @@
     async function validateKey(provider) {
       const inputId = provider === 'telegram' ? 'telegram.botToken' : `${provider}.apiKey`;
       const input = document.getElementById(inputId);
-      const button = input.parentElement.querySelector('button');
+      const button = input.parentElement.querySelector('button:not(.delete-btn)');
       const key = input.value.trim();
 
       if (!key) {
@@ -1844,6 +1876,8 @@
           result = await window.pocketAgent.validateOpenAIKey(key);
         } else if (provider === 'moonshot') {
           result = await window.pocketAgent.validateMoonshotKey(key);
+        } else if (provider === 'glm') {
+          result = await window.pocketAgent.validateGlmKey(key);
         } else if (provider === 'telegram') {
           result = await window.pocketAgent.validateTelegramToken(key);
         }
@@ -1945,6 +1979,7 @@
       const hasOAuth = settings['auth.oauthToken'];
       const hasApiKey = settings['anthropic.apiKey'];
       const hasMoonshotKey = settings['moonshot.apiKey'];
+      const hasGlmKey = settings['glm.apiKey'];
       const anthropicKeyRow = document.getElementById('anthropic-key-row');
       const authApiKeySection = document.getElementById('auth-api-key-section');
       const brainPowerSection = document.getElementById('brain-power-section');
@@ -1955,7 +1990,7 @@
       }
 
       // Connected if any LLM provider is configured
-      const isConnected = (authMethod === 'oauth' && hasOAuth) || hasApiKey || hasMoonshotKey;
+      const isConnected = (authMethod === 'oauth' && hasOAuth) || hasApiKey || hasMoonshotKey || hasGlmKey;
 
       if (authMethod === 'oauth' && hasOAuth) {
         statusBadge.className = 'auth-badge oauth';
@@ -2065,7 +2100,7 @@
 
     async function saveApiKey() {
       const input = document.getElementById('auth-api-key');
-      const button = input.parentElement.querySelector('button');
+      const button = input.parentElement.querySelector('button:not(.delete-btn)');
       const key = input.value.trim();
 
       if (!key) {

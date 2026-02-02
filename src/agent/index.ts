@@ -5,6 +5,7 @@ import { loadIdentity } from '../config/identity';
 import { loadInstructions } from '../config/instructions';
 import { SettingsManager } from '../settings';
 import { EventEmitter } from 'events';
+import { buildCanUseToolCallback, buildPreToolUseHook, setStatusEmitter } from './safety';
 
 // Token limits - defaults, can be overridden by settings
 const DEFAULT_MAX_CONTEXT_TOKENS = 150000;
@@ -23,7 +24,7 @@ function getTokenLimits(): { maxContextTokens: number; compactionThreshold: numb
 }
 
 // Provider configuration for different LLM backends
-type ProviderType = 'anthropic' | 'moonshot';
+type ProviderType = 'anthropic' | 'moonshot' | 'glm';
 
 interface ProviderConfig {
   baseUrl?: string;
@@ -36,6 +37,9 @@ const PROVIDER_CONFIGS: Record<ProviderType, ProviderConfig> = {
   'moonshot': {
     baseUrl: 'https://api.moonshot.ai/anthropic/',
   },
+  'glm': {
+    baseUrl: 'https://api.z.ai/api/anthropic/',
+  },
 };
 
 // Model to provider mapping
@@ -46,6 +50,8 @@ const MODEL_PROVIDERS: Record<string, ProviderType> = {
   'claude-haiku-4-5-20251001': 'anthropic',
   // Moonshot/Kimi models
   'kimi-k2.5': 'moonshot',
+  // Z.AI GLM models
+  'glm-4.7': 'glm',
 };
 
 /**
@@ -81,6 +87,19 @@ function configureProviderEnvironment(model: string): void {
     delete process.env.ANTHROPIC_API_KEY;
 
     console.log('[AgentManager] Provider configured: Moonshot (Kimi)');
+  } else if (provider === 'glm') {
+    // Z.AI GLM requires base URL and uses Bearer token auth
+    const glmKey = SettingsManager.get('glm.apiKey');
+    if (!glmKey) {
+      throw new Error('Z.AI GLM API key not configured. Please add your key in Settings > LLM.');
+    }
+
+    process.env.ANTHROPIC_BASE_URL = config.baseUrl;
+    process.env.ANTHROPIC_AUTH_TOKEN = glmKey;
+    // Clear ANTHROPIC_API_KEY so SDK uses AUTH_TOKEN instead
+    delete process.env.ANTHROPIC_API_KEY;
+
+    console.log('[AgentManager] Provider configured: Z.AI GLM');
   } else {
     // Anthropic provider - ensure no base URL override
     delete process.env.ANTHROPIC_BASE_URL;
@@ -102,7 +121,7 @@ function getSmartContextOptions(currentQuery?: string): SmartContextOptions {
 
 // Status event types
 export type AgentStatus = {
-  type: 'thinking' | 'tool_start' | 'tool_end' | 'responding' | 'done' | 'subagent_start' | 'subagent_update' | 'subagent_end' | 'queued' | 'queue_processing';
+  type: 'thinking' | 'tool_start' | 'tool_end' | 'tool_blocked' | 'responding' | 'done' | 'subagent_start' | 'subagent_update' | 'subagent_end' | 'queued' | 'queue_processing';
   toolName?: string;
   toolInput?: string;
   message?: string;
@@ -113,10 +132,24 @@ export type AgentStatus = {
   // Queue tracking
   queuePosition?: number;
   queuedMessage?: string;
+  // Safety blocking
+  blockedReason?: string;
 };
 
 // SDK types (loaded dynamically)
 type SDKQuery = AsyncGenerator<unknown, void>;
+type CanUseToolCallback = (
+  toolName: string,
+  input: Record<string, unknown>,
+  options: { signal: AbortSignal; toolUseID: string }
+) => Promise<{ behavior: 'allow' } | { behavior: 'deny'; message: string; interrupt: boolean }>;
+type PreToolUseHookCallback = (input: { tool_name: string; tool_input: unknown }) => Promise<{
+  hookSpecificOutput: {
+    hookEventName: 'PreToolUse';
+    permissionDecision: 'allow' | 'deny';
+    permissionDecisionReason?: string;
+  };
+}>;
 type SDKOptions = {
   model?: string;
   cwd?: string;
@@ -129,6 +162,10 @@ type SDKOptions = {
   systemPrompt?: string | { type: 'preset'; preset: 'claude_code'; append?: string };
   mcpServers?: Record<string, unknown>;
   settingSources?: ('project' | 'user')[];  // Load skills from .claude/skills/
+  canUseTool?: CanUseToolCallback;  // Pre-tool-use validation callback
+  hooks?: {
+    PreToolUse?: Array<{ hooks: PreToolUseHookCallback[] }>;
+  };
 };
 
 // Thinking level to token budget mapping
@@ -239,6 +276,11 @@ class AgentManagerClass extends EventEmitter {
     this.memory.setSummarizer(this.createSummary.bind(this));
     setMemoryManager(this.memory);
     setSoulMemoryManager(this.memory);
+
+    // Set up safety status emitter for UI feedback on blocked tools
+    setStatusEmitter((status) => {
+      this.emitStatus(status);
+    });
 
     console.log('[AgentManager] Initialized');
     console.log('[AgentManager] Project root:', this.projectRoot);
@@ -712,6 +754,10 @@ class AgentManagerClass extends EventEmitter {
       abortController,
       tools: { type: 'preset', preset: 'claude_code' },
       settingSources: ['project'],  // Load skills from .claude/skills/
+      canUseTool: buildCanUseToolCallback(),  // Pre-tool-use safety validation
+      hooks: {
+        PreToolUse: [buildPreToolUseHook()],  // Pre-tool-use safety hook
+      },
       allowedTools: [
         // Built-in SDK tools
         'Read', 'Write', 'Edit', 'Bash', 'Glob', 'Grep', 'WebSearch', 'WebFetch',
@@ -747,6 +793,10 @@ class AgentManagerClass extends EventEmitter {
         'mcp__pocket-agent__task_complete',
         'mcp__pocket-agent__task_delete',
         'mcp__pocket-agent__task_due',
+        // Custom MCP tools - project
+        'mcp__pocket-agent__set_project',
+        'mcp__pocket-agent__get_project',
+        'mcp__pocket-agent__clear_project',
       ],
       persistSession: false,
     };

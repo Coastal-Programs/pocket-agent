@@ -2712,12 +2712,13 @@
       try {
         const modelId = await window.pocketAgent.getSetting('agent.model');
         const modelNames = {
-          'claude-opus-4-5-20251101': 'Opus 4.5',
-          'claude-sonnet-4-5-20250929': 'Sonnet 4.5',
-          'claude-haiku-4-5-20251001': 'Haiku 4.5',
-          'kimi-k2.5': 'Kimi K2.5',
+          'claude-opus-4-5-20251101': 'OPUS 4.5',
+          'claude-sonnet-4-5-20250929': 'SONNET 4.5',
+          'claude-haiku-4-5-20251001': 'HAIKU 4.5',
+          'kimi-k2.5': 'KIMI K2.5',
+          'glm-4.7': 'GLM-4.7',
         };
-        const displayName = modelNames[modelId] || modelId;
+        const displayName = modelNames[modelId] || modelId.toUpperCase();
         document.getElementById('model-badge').textContent = displayName;
       } catch (err) {
         console.error('Failed to load model:', err);

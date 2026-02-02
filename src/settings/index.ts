@@ -149,6 +149,15 @@ export const SETTINGS_SCHEMA: SettingDefinition[] = [
     description: 'Your Moonshot API key for Kimi models',
     type: 'password',
   },
+  {
+    key: 'glm.apiKey',
+    defaultValue: '',
+    encrypted: true,
+    category: 'api_keys',
+    label: 'Z.AI GLM API Key',
+    description: 'Your Z.AI API key for GLM models',
+    type: 'password',
+  },
 
   // Agent settings
   {
@@ -876,6 +885,34 @@ class SettingsManagerClass {
         },
         body: JSON.stringify({
           model: 'kimi-k2.5',
+          max_tokens: 10,
+          messages: [{ role: 'user', content: 'Hi' }],
+        }),
+      });
+
+      if (response.ok) {
+        return { valid: true };
+      }
+
+      const data = await response.json();
+      return { valid: false, error: data.error?.message || 'Invalid API key' };
+    } catch (error) {
+      return { valid: false, error: error instanceof Error ? error.message : 'Connection failed' };
+    }
+  }
+
+  async validateGlmKey(apiKey: string): Promise<{ valid: boolean; error?: string }> {
+    try {
+      // Z.AI GLM uses Anthropic-compatible API with Bearer token auth
+      const response = await fetch('https://api.z.ai/api/anthropic/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({
+          model: 'glm-4.7',
           max_tokens: 10,
           messages: [{ role: 'user', content: 'Hi' }],
         }),
