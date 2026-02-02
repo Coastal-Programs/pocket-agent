@@ -90,7 +90,7 @@ contextBridge.exposeInMainWorld('pocketAgent', {
   validateTelegramToken: (token: string) => ipcRenderer.invoke('settings:validateTelegram', token),
   getAvailableModels: () => ipcRenderer.invoke('settings:getAvailableModels'),
   restartAgent: () => ipcRenderer.invoke('agent:restart'),
-  openSettings: () => ipcRenderer.invoke('app:openSettings'),
+  openSettings: (tab?: string) => ipcRenderer.invoke('app:openSettings', tab),
   openChat: () => ipcRenderer.invoke('app:openChat'),
   startOAuth: () => ipcRenderer.invoke('auth:startOAuth'),
   completeOAuth: (code: string) => ipcRenderer.invoke('auth:completeOAuth', code),
@@ -208,7 +208,7 @@ declare global {
       validateTelegramToken: (token: string) => Promise<{ valid: boolean; error?: string; botInfo?: unknown }>;
       getAvailableModels: () => Promise<Array<{ id: string; name: string; provider: string }>>;
       restartAgent: () => Promise<{ success: boolean }>;
-      openSettings: () => Promise<void>;
+      openSettings: (tab?: string) => Promise<void>;
       openChat: () => Promise<void>;
       startOAuth: () => Promise<{ success: boolean; error?: string }>;
       completeOAuth: (code: string) => Promise<{ success: boolean; error?: string }>;
