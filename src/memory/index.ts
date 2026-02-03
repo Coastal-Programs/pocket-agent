@@ -665,6 +665,7 @@ export class MemoryManager {
         t.group_name as telegram_group_name
       FROM sessions s
       LEFT JOIN telegram_chat_sessions t ON s.id = t.session_id
+      GROUP BY s.id
       ORDER BY s.updated_at DESC
     `).all() as SessionRow[];
     return rows.map(row => ({

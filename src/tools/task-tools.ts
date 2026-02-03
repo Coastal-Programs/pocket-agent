@@ -193,19 +193,7 @@ function ensureTable(db: Database.Database): void {
 export function getTaskAddToolDefinition() {
   return {
     name: 'task_add',
-    description: `Add a new task/todo item with optional due date, priority, and reminder.
-
-Use when user wants to:
-- Create a todo item
-- Add something to their task list
-- Set a task with a deadline
-
-Priority levels: low, medium (default), high
-
-Examples:
-- task_add("Buy groceries")
-- task_add("Call mom", due="tomorrow 5pm", priority="high")
-- task_add("Submit report", due="friday", reminder_minutes=60)`,
+    description: 'Add a new task/todo item with optional due date, priority (low/medium/high), and reminder.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -278,14 +266,7 @@ export async function handleTaskAddTool(input: unknown): Promise<string> {
 export function getTaskListToolDefinition() {
   return {
     name: 'task_list',
-    description: `List tasks/todos. Optionally filter by status.
-
-Status options: pending (default), completed, in_progress, all
-
-Examples:
-- task_list() - pending tasks
-- task_list(status="all")
-- task_list(status="completed")`,
+    description: 'List tasks/todos. Filter by status: pending (default), completed, in_progress, or all.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -435,11 +416,7 @@ export async function handleTaskDeleteTool(input: unknown): Promise<string> {
 export function getTaskDueToolDefinition() {
   return {
     name: 'task_due',
-    description: `Get tasks due within the next N hours, including overdue tasks.
-
-Examples:
-- task_due() - due in next 24 hours (default)
-- task_due(hours=48)`,
+    description: 'Get tasks due within the next N hours, including overdue (default: 24 hours).',
     input_schema: {
       type: 'object' as const,
       properties: {

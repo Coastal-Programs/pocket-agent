@@ -892,11 +892,17 @@
       color: var(--text-secondary);
     }
 
+    .message .table-wrapper {
+      overflow-x: auto;
+      margin: 0.5em 0;
+      max-width: 100%;
+    }
+
     .message table {
       border-collapse: collapse;
-      margin: 0.5em 0;
-      width: 100%;
+      min-width: 100%;
       font-size: 0.95em;
+      white-space: nowrap;
     }
 
     .message th, .message td {
@@ -2167,11 +2173,16 @@
     async function loadSessions() {
       try {
         sessions = await window.pocketAgent.getSessions();
-        renderTabs();
-        // Set current session to the first one (most recently active) or default
+        // Restore last selected session from localStorage, or default to first session
+        // Must be set BEFORE renderTabs() so the correct tab is highlighted
         if (sessions.length > 0) {
-          currentSessionId = sessions[0].id;
+          const savedSessionId = localStorage.getItem('currentSessionId');
+          const sessionExists = savedSessionId && sessions.some(s => s.id === savedSessionId);
+          currentSessionId = sessionExists ? savedSessionId : sessions[0].id;
+          // Save in case we defaulted to first session
+          localStorage.setItem('currentSessionId', currentSessionId);
         }
+        renderTabs();
       } catch (err) {
         console.error('Failed to load sessions:', err);
       }
@@ -2321,6 +2332,7 @@
 
       // Switch to new session
       currentSessionId = sessionId;
+      localStorage.setItem('currentSessionId', currentSessionId);
       renderTabs();
       messagesDiv.innerHTML = '';
       await loadHistory();
@@ -2530,6 +2542,7 @@
         // If we deleted the current session, switch to another
         if (sessionId === currentSessionId) {
           currentSessionId = sessions[0]?.id || 'default';
+          localStorage.setItem('currentSessionId', currentSessionId);
           messagesDiv.innerHTML = '';
           await loadHistory();
         }
@@ -3172,7 +3185,11 @@
           breaks: true, // Convert \n to <br>
           gfm: true, // GitHub flavored markdown
         });
-        return marked.parse(text);
+        let html = marked.parse(text);
+        // Wrap tables in scrollable container
+        html = html.replace(/<table>/g, '<div class="table-wrapper"><table>');
+        html = html.replace(/<\/table>/g, '</table></div>');
+        return html;
       }
       // Fallback if marked isn't loaded
       return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');

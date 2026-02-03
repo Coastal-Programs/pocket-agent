@@ -701,6 +701,37 @@ class AgentManagerClass extends EventEmitter {
     return false;
   }
 
+  /**
+   * Get the current workspace directory
+   */
+  getWorkspace(): string {
+    return this.workspace;
+  }
+
+  /**
+   * Get the default project root directory
+   */
+  getProjectRoot(): string {
+    return this.projectRoot;
+  }
+
+  /**
+   * Set the workspace directory for agent file operations.
+   * This takes effect on the next SDK query (cwd option).
+   */
+  setWorkspace(path: string): void {
+    console.log('[AgentManager] Workspace changed:', this.workspace, '->', path);
+    this.workspace = path;
+  }
+
+  /**
+   * Reset workspace to default project root
+   */
+  resetWorkspace(): void {
+    console.log('[AgentManager] Workspace reset to project root:', this.projectRoot);
+    this.workspace = this.projectRoot;
+  }
+
   private async buildOptions(factsContext: string, soulContext: string, abortController: AbortController, lastMessageTimestamp?: string): Promise<SDKOptions> {
     const appendParts: string[] = [];
 
@@ -765,7 +796,6 @@ class AgentManagerClass extends EventEmitter {
         // Custom MCP tools - browser & system
         'mcp__pocket-agent__browser',
         'mcp__pocket-agent__notify',
-        'mcp__pocket-agent__pty_exec',
         // Custom MCP tools - memory
         'mcp__pocket-agent__remember',
         'mcp__pocket-agent__forget',
@@ -937,18 +967,6 @@ You can send native desktop notifications:
 # Use the notify tool to alert the user
 notify(title="Task Complete", body="Your download has finished")
 notify(title="Reminder", body="Meeting in 5 minutes", urgency="critical")
-\`\`\`
-
-### Interactive Commands (PTY)
-For interactive CLI commands that need a terminal:
-
-\`\`\`bash
-# Use pty_exec instead of Bash when you need:
-# - Interactive prompts (npm init, git interactive)
-# - Commands that require TTY
-# - Colored output
-pty_exec(command="npm init")
-pty_exec(command="htop", timeout=30000)
 \`\`\`
 
 ### Limitations
@@ -1180,7 +1198,6 @@ pty_exec(command="htop", timeout=30000)
 
       // macOS tools
       notify: 'sending a meow',
-      pty_exec: 'doing terminal zoomies',
 
       // Task tools
       task_add: 'adding to the hunt list',

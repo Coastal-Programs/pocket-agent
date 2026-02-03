@@ -286,7 +286,6 @@ ${heartbeatInstruction}
 
 ### System
 - \`notify(title, body?, urgency?)\` - Desktop notification
-- \`pty_exec(command)\` - Interactive terminal
 
 ## Time Formats
 - Natural: "today 3pm", "tomorrow 9am", "monday 2pm"

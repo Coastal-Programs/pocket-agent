@@ -213,20 +213,7 @@ function formatDuration(ms: number): string {
 export function getScheduleTaskToolDefinition() {
   return {
     name: 'schedule_task',
-    description: `Create a scheduled routine where the agent performs an ACTION.
-
-Use this for tasks where the agent should DO something (check weather, summarize news, etc).
-For simple reminders, use create_reminder instead.
-
-Schedule formats:
-- Recurring intervals: "30m", "2h", "1d"
-- Cron expressions: "0 9 * * *" (minute hour day month weekday)
-- One-time: "in 10 minutes", "tomorrow 3pm"
-
-IMPORTANT: The 'prompt' field is an INSTRUCTION that will be sent to a future LLM instance.
-Write it as a command, not as formatted output.
-- GOOD: "Check the weather and tell the user"
-- BAD: "Good morning! Here's your weather: ☀️"`,
+    description: 'Create a scheduled routine where the agent performs an action. Schedule: "30m", "2h", cron "0 9 * * *", or "in 10 minutes". The prompt is an instruction for a future LLM (write as command, not output).',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -410,21 +397,7 @@ export async function handleScheduleTaskTool(input: unknown): Promise<string> {
 export function getCreateReminderToolDefinition() {
   return {
     name: 'create_reminder',
-    description: `Create a simple reminder to notify the user about something.
-
-Use this when the user says "remind me to..." or "don't let me forget to..."
-For action-based tasks (check weather, etc), use schedule_task instead.
-
-Schedule formats:
-- One-time: "in 10 minutes", "tomorrow 3pm", "monday 9am"
-- Recurring: "30m", "2h", or cron "0 9 * * *"
-
-IMPORTANT: The 'reminder' field is the FINAL MESSAGE shown to the user.
-Compose a friendly, complete reminder message - it will be displayed directly with NO further LLM processing.
-- GOOD: "Hey Ken! Time to take a shower 🚿"
-- GOOD: "Don't forget to call mom! 📱"
-- BAD: "take a shower" (too minimal)
-- BAD: "Remind Ken to take a shower" (this is an instruction, not a message)`,
+    description: 'Create a simple reminder to notify the user. Schedule: "in 10 minutes", "tomorrow 3pm", "30m", or cron. The reminder field is the final message shown directly to user (compose a friendly, complete message).',
     input_schema: {
       type: 'object' as const,
       properties: {

@@ -19,9 +19,8 @@ import { getTaskTools } from './task-tools';
 import {
   getNotifyToolDefinition,
   handleNotifyTool,
-  getPtyExecToolDefinition,
-  handlePtyExecTool,
 } from './macos';
+import { getProjectTools } from './project-tools';
 import { wrapToolHandler, getToolTimeout, logActiveToolsStatus } from './diagnostics';
 
 export { logActiveToolsStatus } from './diagnostics';
@@ -36,7 +35,7 @@ export { setSoulMemoryManager } from './soul-tools';
 export { getSchedulerTools } from './scheduler-tools';
 export { getCalendarTools } from './calendar-tools';
 export { getTaskTools, closeTaskDb } from './task-tools';
-export { showNotification, execWithPty } from './macos';
+export { showNotification } from './macos';
 export { setCurrentSessionId, getCurrentSessionId } from './session-context';
 
 export interface MCPServerConfig {
@@ -135,7 +134,6 @@ export async function buildSdkMcpServers(
     // Wrap handlers with diagnostics (timing, logging, timeouts)
     const wrappedBrowserHandler = wrapToolHandler('browser', handleBrowserTool, getToolTimeout('browser'));
     const wrappedNotifyHandler = wrapToolHandler('notify', handleNotifyTool, getToolTimeout('notify'));
-    const wrappedPtyExecHandler = wrapToolHandler('pty_exec', handlePtyExecTool, getToolTimeout('pty_exec'));
 
     // Browser tool (if enabled)
     if (config.browser.enabled) {
@@ -198,23 +196,6 @@ export async function buildSdkMcpServers(
       }
     );
     tools.push(notifyTool);
-
-    // PTY exec tool
-    const ptyExecTool = tool(
-      'pty_exec',
-      getPtyExecToolDefinition().description,
-      {
-        command: z.string(),
-        args: z.array(z.string()).optional(),
-        cwd: z.string().optional(),
-        timeout: z.number().optional(),
-      },
-      async (args) => {
-        const result = await wrappedPtyExecHandler(args);
-        return { content: [{ type: 'text', text: result }] };
-      }
-    );
-    tools.push(ptyExecTool);
 
     // Memory tools (with diagnostics wrapper)
     const memoryTools = getMemoryTools();
@@ -333,6 +314,29 @@ export async function buildSdkMcpServers(
       tools.push(sdkTool);
     }
 
+    // Project tools (with diagnostics wrapper)
+    const projectTools = getProjectTools();
+    for (const projTool of projectTools) {
+      const wrappedHandler = wrapToolHandler(projTool.name, projTool.handler, getToolTimeout(projTool.name));
+      const sdkTool = tool(
+        projTool.name,
+        projTool.description,
+        Object.fromEntries(
+          Object.entries(projTool.input_schema.properties || {}).map(([key, value]: [string, unknown]) => {
+            const prop = value as { type?: string };
+            if (prop.type === 'string') return [key, z.string().optional()];
+            if (prop.type === 'number') return [key, z.number().optional()];
+            return [key, z.any().optional()];
+          })
+        ),
+        async (args) => {
+          const result = await wrappedHandler(args);
+          return { content: [{ type: 'text', text: result }] };
+        }
+      );
+      tools.push(sdkTool);
+    }
+
     // Create the SDK MCP server
     const server = createSdkMcpServer({
       name: 'pocket-agent-tools',
@@ -416,14 +420,6 @@ export function getCustomTools(config: ToolsConfig): Array<{
     handler: handleNotifyTool,
   });
 
-  const ptyExecDef = getPtyExecToolDefinition();
-  tools.push({
-    name: ptyExecDef.name,
-    description: ptyExecDef.description,
-    input_schema: ptyExecDef.input_schema as Record<string, unknown>,
-    handler: handlePtyExecTool,
-  });
-
   // Calendar tools
   const calendarTools = getCalendarTools();
   for (const tool of calendarTools) {
@@ -438,6 +434,17 @@ export function getCustomTools(config: ToolsConfig): Array<{
   // Task tools
   const taskTools = getTaskTools();
   for (const tool of taskTools) {
+    tools.push({
+      name: tool.name,
+      description: tool.description,
+      input_schema: tool.input_schema as Record<string, unknown>,
+      handler: tool.handler,
+    });
+  }
+
+  // Project tools
+  const projectTools = getProjectTools();
+  for (const tool of projectTools) {
     tools.push({
       name: tool.name,
       description: tool.description,

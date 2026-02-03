@@ -161,21 +161,7 @@ function ensureTable(db: Database.Database): void {
 export function getCalendarAddToolDefinition() {
   return {
     name: 'calendar_add',
-    description: `Add a calendar event with optional reminder.
-
-Use when user wants to:
-- Schedule an event or meeting
-- Set up a calendar reminder
-- Plan an appointment
-
-Time formats supported:
-- "today 3pm", "tomorrow 9am", "monday 2pm"
-- "in 2 hours", "in 30 minutes"
-- ISO format: "2024-03-15T14:00:00"
-
-Examples:
-- calendar_add("Team meeting", "tomorrow 2pm", reminder_minutes=15)
-- calendar_add("Dentist", "monday 10am", location="123 Main St")`,
+    description: 'Add a calendar event with optional reminder. Time formats: "today 3pm", "tomorrow 9am", "in 2 hours", or ISO.',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -246,12 +232,7 @@ export async function handleCalendarAddTool(input: unknown): Promise<string> {
 export function getCalendarListToolDefinition() {
   return {
     name: 'calendar_list',
-    description: `List calendar events. Optionally filter by date.
-
-Examples:
-- calendar_list() - all events
-- calendar_list(date="today")
-- calendar_list(date="tomorrow")`,
+    description: 'List calendar events. Optionally filter by date ("today", "tomorrow", or YYYY-MM-DD).',
     input_schema: {
       type: 'object' as const,
       properties: {
@@ -319,11 +300,7 @@ export async function handleCalendarListTool(input: unknown): Promise<string> {
 export function getCalendarUpcomingToolDefinition() {
   return {
     name: 'calendar_upcoming',
-    description: `Get upcoming calendar events within the next N hours.
-
-Examples:
-- calendar_upcoming() - next 24 hours (default)
-- calendar_upcoming(hours=48)`,
+    description: 'Get upcoming calendar events within the next N hours (default: 24).',
     input_schema: {
       type: 'object' as const,
       properties: {
